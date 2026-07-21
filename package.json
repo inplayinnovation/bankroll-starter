@@ -1,0 +1,40 @@
+{
+  "name": "bankroll-starter",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "bankroll": "node scripts/bankroll.mjs",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/welcome.mjs || exit 0"
+  },
+  "dependencies": {
+    "@joinbankroll/sdk": "^0.5.0",
+    "@vercel/blob": "^2.0.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "bs58": "6.0.0",
+    "cloudflared": "^0.7.1",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.0.0",
+    "qrcode-generator": "^2.0.4",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "uuid": "^11.0.0"
+  }
+}

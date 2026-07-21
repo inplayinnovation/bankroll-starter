@@ -1,0 +1,38 @@
+@import 'tailwindcss';
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-neutral-950 text-neutral-100 antialiased;
+}
+
+.btn {
+  @apply rounded-lg bg-neutral-100 px-4 py-2.5 text-center font-medium text-neutral-950
+    transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+.card {
+  @apply rounded-xl border border-neutral-800 bg-neutral-900/60 p-4;
+}
+
+code {
+  @apply rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm break-all;
+}
+
+/* Terminal caret. step-end so it snaps rather than fades. */
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.caret {
+  animation: caret-blink 1.06s step-end infinite;
+}

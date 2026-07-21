@@ -1,0 +1,13 @@
+node_modules
+.next
+.env
+.env*.local
+.vercel
+next-env.d.ts
+*.tsbuildinfo
+.DS_Store
+
+certificates
+# Local filesystem store (STORE=fs)
+bankroll/
+TRACKER.md
