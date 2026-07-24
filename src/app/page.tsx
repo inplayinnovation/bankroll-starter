@@ -7,12 +7,10 @@
 // reimplementing any of it.
 import { playLink } from '@joinbankroll/sdk';
 
-import { appName } from '@/lib/app-identity';
+import { APP_PATH, appName } from '@/lib/app-identity';
 import { publicOrigin } from '@/lib/origin';
 
 export const dynamic = 'force-dynamic';
-
-const APP_PATH = '/app';
 
 export default async function Home() {
   // In development this is the tunnel, so the link works from the laptop that

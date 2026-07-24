@@ -9,7 +9,7 @@
 // Your app ICON is not in the manifest: serve a square PNG at the fixed path
 // /.well-known/bankroll-icon.png (drop it in public/.well-known/). Until you
 // do, Bankroll shows a monogram of your app's name.
-import { appName } from '@/lib/app-identity';
+import { APP_PATH, appName } from '@/lib/app-identity';
 import { getOrigin } from '@/lib/origin';
 import { treasuryAddress } from '@/lib/treasury';
 
@@ -29,6 +29,9 @@ export async function GET() {
     // Payments are declared only once a treasury exists, so an app that hasn't
     // finished setup advertises what it can actually honor.
     capabilities: payments ? { session: true, payments } : { session: true },
+    // Boot a connected app at /app; the origin serves the landing page, not the
+    // app, so without this the host would open the lander instead.
+    launch: APP_PATH,
     manifestVersion: 1,
     name: appName(),
     sub: origin,
