@@ -4,10 +4,11 @@
 // product, so what's on show is the money loop and the store, not the thing
 // being sold. Replace the loot box with whatever you're building; the shape of
 // these routes is the part worth keeping.
-import { ConfirmChargeError, confirmCharge } from '@joinbankroll/sdk/server';
+import { ConfirmChargeError, confirmCharge, HSUSD_MINT } from '@joinbankroll/sdk/server';
 
 import '@/lib/rpc';
 
+import { appTokenMint } from '@/lib/app-identity';
 import { requireIdentity, requireSession, Unauthorized } from '@/lib/session';
 import { listPurchases, recordPurchase } from '@/lib/store';
 import { requireTreasury } from '@/lib/treasury';
@@ -37,11 +38,20 @@ export async function POST(request: Request) {
     // 1. What actually settled on-chain? A return value means it settled.
     const charge = await confirmCharge(signature);
 
-    // 2. Does it match what we expected? All three checks release value.
+    // 2. Does it match what we expected? All four checks release value.
     //    The payee check is the one to never skip: any settled transfer passes
-    //    the other two, including one the user sent to their own second wallet.
+    //    the others, including one the user sent to their own second wallet.
+    //    The mint check is the second: the signature comes from the client, so
+    //    without it a token the sender minted themselves — worth nothing,
+    //    costing them cents to create — buys a box and is paid out in real
+    //    HSUSD. Only HSUSD and this app's own token are ever accepted, and
+    //    which one paid is recorded so opening returns the same asset.
+    const tokenMint = appTokenMint();
     if (charge.payee !== treasury.address) {
       return Response.json({ error: 'payment went to another address' }, { status: 400 });
+    }
+    if (charge.mint !== HSUSD_MINT && charge.mint !== tokenMint) {
+      return Response.json({ error: 'payment was made in another asset' }, { status: 400 });
     }
     if (charge.amountCents !== PRICE_CENTS) {
       return Response.json({ error: 'payment amount does not match' }, { status: 400 });
@@ -59,6 +69,7 @@ export async function POST(request: Request) {
       signature,
       charge.slot,
       charge.amountCents,
+      charge.mint,
     );
 
     // A repeat is not a failure. A retried request and a replayed one look

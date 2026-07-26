@@ -37,6 +37,8 @@ export interface Me {
   /** Where the user is for this session — not where they live. */
   geo: string | null;
   treasuryConfigured: boolean;
+  /** This app's own token, when it issues one. Null when it doesn't. */
+  appToken: { mint: string; name: string } | null;
 }
 
 async function fetchMe(): Promise<Me | null> {
@@ -103,10 +105,13 @@ export function usePurchases(): { purchases: Purchase[]; refresh: () => Promise<
  * per call — never shared across purchases — so two buys are two payments while
  * a retry of one buy is not.
  */
-export async function buy(): Promise<{ ok: boolean; error?: string }> {
+export async function buy(token?: string): Promise<{ ok: boolean; error?: string }> {
   const idempotencyKey = crypto.randomUUID();
   try {
-    const signature = await bankroll.charge({ amountCents: PRICE_CENTS, idempotencyKey });
+    // `token` names one of the app's own declared mints; omitted, the charge
+    // settles in HSUSD. Either way the server checks which asset actually paid
+    // before it releases anything.
+    const signature = await bankroll.charge({ amountCents: PRICE_CENTS, idempotencyKey, token });
     const response = await bankrollFetch('/api/purchases', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

@@ -9,7 +9,7 @@
 // Your app ICON is not in the manifest: serve a square PNG at the fixed path
 // /.well-known/bankroll-icon.png (drop it in public/.well-known/). Until you
 // do, Bankroll shows a monogram of your app's name.
-import { APP_PATH, appName } from '@/lib/app-identity';
+import { APP_PATH, appName, appTokenMint, appTokenName } from '@/lib/app-identity';
 import { getOrigin } from '@/lib/origin';
 import { treasuryAddress } from '@/lib/treasury';
 
@@ -20,11 +20,19 @@ const base64url = (value: object) => Buffer.from(JSON.stringify(value)).toString
 export async function GET() {
   const origin = await getOrigin();
   const payments = treasuryAddress();
+  const tokenMint = appTokenMint();
 
   // An unsecured JWT (alg: none, empty signature) — the origin it is served
   // from is the proof, not a signature.
   const header = { alg: 'none', typ: 'bankroll-app-manifest+jwt' };
   const payload = {
+    // Declaring your own mint is what permits a charge to settle in it: the
+    // host lets this app charge HSUSD or these, and nothing else, so a hijacked
+    // page can never reach a user's unrelated holdings. Omitted entirely when
+    // the app issues no token.
+    ...(tokenMint
+      ? { appTokens: { [tokenMint]: { description: `Funds for ${appName()}`, name: appTokenName() } } }
+      : {}),
     aud: 'bankroll-app-host',
     // Payments are declared only once a treasury exists, so an app that hasn't
     // finished setup advertises what it can actually honor.

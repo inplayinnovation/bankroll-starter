@@ -76,6 +76,12 @@ export interface Purchase {
   id: string;
   /** The payment signature that bought it. */
   signature: string;
+  /**
+   * The mint that paid — HSUSD, or one of this app's own tokens. Recorded so
+   * opening pays back in the same asset: a box bought with tokens the app gave
+   * away must never pay out real money.
+   */
+  mint: string;
   amountCents: number;
   status: PurchaseStatus;
   purchasedAt: string;
@@ -113,6 +119,7 @@ export async function recordPurchase(
   signature: string,
   slot: number,
   amountCents: number,
+  mint: string,
   meta?: Record<string, unknown>,
 ): Promise<{ created: boolean; purchase: Purchase }> {
   const id = buildId(slot, signature);
@@ -120,6 +127,7 @@ export async function recordPurchase(
   const purchase: Purchase = {
     id,
     signature,
+    mint,
     amountCents,
     status: 'unconsumed',
     purchasedAt: new Date().toISOString(),

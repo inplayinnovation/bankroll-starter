@@ -47,8 +47,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // bytes that get sent must be the ones that got stored, so a resume and a
     // race broadcast the identical transfer.
     if (purchase.status === 'unconsumed') {
+      // Pay back in the asset that paid. A box bought with this app's own token
+      // returns that token, never HSUSD — otherwise credit the app gives away
+      // for free would be a route to real money.
       const built = await buildPayout(
-        { to: wallet, amountCents: purchase.amountCents, memo: `open:${id}` },
+        {
+          to: wallet,
+          amountCents: purchase.amountCents,
+          memo: `open:${id}`,
+          token: purchase.mint,
+        },
         { signer },
       );
       purchase = await updatePurchase(wallet, id, (current) => {

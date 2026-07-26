@@ -99,9 +99,22 @@ export function Shop({ ready, devTools }: { ready: boolean; devTools?: React.Rea
         </button>
       ) : (
         <>
-          <button className="btn" disabled={busy} onClick={() => run(buy)}>
+          <button className="btn" disabled={busy} onClick={() => run(() => buy())}>
             Buy a loot box — $1.00
           </button>
+
+          {/* Paying with the app's own token, when it issues one. Opening pays
+              back in whatever bought it, so this box costs tokens and returns
+              tokens — free credit never becomes real money. */}
+          {me.appToken && (
+            <button
+              className="btn"
+              disabled={busy}
+              onClick={() => run(() => buy(me.appToken!.mint))}
+            >
+              Buy with {me.appToken.name}
+            </button>
+          )}
 
           <section className="flex flex-col gap-2">
             <h2 className="text-sm tracking-wide text-neutral-400 uppercase">Your loot boxes</h2>

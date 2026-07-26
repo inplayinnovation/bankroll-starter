@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { HSUSD_MINT } from '@joinbankroll/sdk/server';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -20,7 +21,7 @@ describe('recordPurchase', () => {
   it('records a purchase and returns its id', async () => {
     const w = wallet();
     const s = signature();
-    const { created, purchase } = await recordPurchase(w, s, 1000, 100);
+    const { created, purchase } = await recordPurchase(w, s, 1000, 100, HSUSD_MINT);
     expect(created).toBe(true);
     expect(purchase.id).toBe(buildId(1000, s));
     expect(purchase.status).toBe('unconsumed');
@@ -30,8 +31,8 @@ describe('recordPurchase', () => {
   it('is idempotent — a replayed signature returns the existing purchase', async () => {
     const w = wallet();
     const s = signature();
-    const first = await recordPurchase(w, s, 1000, 100);
-    const second = await recordPurchase(w, s, 1000, 100);
+    const first = await recordPurchase(w, s, 1000, 100, HSUSD_MINT);
+    const second = await recordPurchase(w, s, 1000, 100, HSUSD_MINT);
     expect(second.created).toBe(false);
     expect(second.purchase.id).toBe(first.purchase.id);
   });
@@ -40,7 +41,7 @@ describe('recordPurchase', () => {
     const w = wallet();
     const s = signature();
     const results = await Promise.all(
-      Array.from({ length: 8 }, () => recordPurchase(w, s, 1000, 100)),
+      Array.from({ length: 8 }, () => recordPurchase(w, s, 1000, 100, HSUSD_MINT)),
     );
     expect(results.filter((r) => r.created)).toHaveLength(1);
     const { purchases } = await listPurchases(w);
@@ -52,7 +53,7 @@ describe('getPurchase', () => {
   it('reads a purchase by id', async () => {
     const w = wallet();
     const s = signature();
-    const { purchase } = await recordPurchase(w, s, 1000, 100);
+    const { purchase } = await recordPurchase(w, s, 1000, 100, HSUSD_MINT);
     expect((await getPurchase(w, purchase.id))?.signature).toBe(s);
   });
 
@@ -65,7 +66,7 @@ describe('listPurchases', () => {
   it('returns newest first, by slot', async () => {
     const w = wallet();
     // Record out of slot order on purpose.
-    for (const slot of [30, 10, 50, 20, 40]) await recordPurchase(w, signature(), slot, 100);
+    for (const slot of [30, 10, 50, 20, 40]) await recordPurchase(w, signature(), slot, 100, HSUSD_MINT);
     const { purchases } = await listPurchases(w);
     expect(purchases.map((p) => p.id.split('-')[0])).toEqual(
       [...purchases.map((p) => p.id.split('-')[0])].sort(),
@@ -77,7 +78,7 @@ describe('listPurchases', () => {
   it('pages through a long history with a cursor, newest first, no gaps or repeats', async () => {
     const w = wallet();
     const slots = Array.from({ length: 12 }, (_, i) => (i + 1) * 10);
-    for (const slot of slots) await recordPurchase(w, signature(), slot, 100);
+    for (const slot of slots) await recordPurchase(w, signature(), slot, 100, HSUSD_MINT);
 
     const seen: string[] = [];
     let cursor: string | undefined;
@@ -103,7 +104,7 @@ describe('listPurchases', () => {
 describe('updatePurchase', () => {
   it('moves a purchase through its lifecycle', async () => {
     const w = wallet();
-    const { purchase } = await recordPurchase(w, signature(), 1000, 100);
+    const { purchase } = await recordPurchase(w, signature(), 1000, 100, HSUSD_MINT);
     const consumed = await updatePurchase(w, purchase.id, (p) => ({
       ...p,
       status: 'consumed',
@@ -121,7 +122,7 @@ describe('updatePurchase', () => {
 
   it('consumes exactly once under concurrency', async () => {
     const w = wallet();
-    const { purchase } = await recordPurchase(w, signature(), 1000, 100);
+    const { purchase } = await recordPurchase(w, signature(), 1000, 100, HSUSD_MINT);
     // Many callers race to consume; the transition must win exactly once.
     const consume = () =>
       updatePurchase(w, purchase.id, (p) => {

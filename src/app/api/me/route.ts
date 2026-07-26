@@ -1,3 +1,4 @@
+import { appTokenMint, appTokenName } from '@/lib/app-identity';
 import { getSession } from '@/lib/session';
 import { treasuryAddress } from '@/lib/treasury';
 
@@ -18,5 +19,9 @@ export async function GET(request: Request) {
     // host didn't report one.
     geo: session.geo ?? null,
     treasuryConfigured: treasuryAddress() !== null,
+    // The app's own token, when it issues one, so the client can offer paying
+    // with it. Naming the mint here is safe: the manifest already declares it
+    // publicly, and that declaration is what bounds what this app may charge.
+    appToken: appTokenMint() ? { mint: appTokenMint()!, name: appTokenName() } : null,
   });
 }
