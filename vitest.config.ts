@@ -36,6 +36,16 @@ export default defineConfig({
       // suite against Vercel Blob, which is what a deployment actually uses.
       STORE: process.env.STORE ?? 'fs',
       ...testEnvFile(),
+      // The Blob backend reads BLOB_READ_WRITE_TOKEN — which is exactly the
+      // variable `vercel env pull` fills with a REAL store's token. Pinning it
+      // to the throwaway token, and to empty when there isn't one, is what stops
+      // `STORE=blob npm test` from writing to production data that happens to be
+      // configured on this machine. Last, so nothing can override it.
+      //
+      // This assignment used to live in the store conformance test. That test
+      // moved to the SDK with the code it covers, and the safety wiring has to
+      // stay here, where the suite that writes still runs.
+      BLOB_READ_WRITE_TOKEN: testEnvFile().DANGEROUS_BLOB_TOKEN ?? '',
     },
     // Test files share one filesystem store, so they run one at a time rather
     // than racing each other's fixtures.

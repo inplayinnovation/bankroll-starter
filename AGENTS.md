@@ -20,11 +20,12 @@ npm run lint       # eslint
 
 Run `npm run typecheck && npm run lint` before finishing any change.
 
-`test/store-contract.test.ts` runs one contract against both backends (files and
-Vercel Blob) so they can't diverge — the Blob leg when `DANGEROUS_BLOB_TOKEN` is
-in `.env.test.local`, skipped otherwise. `test/environment.test.ts` asserts the
-suite is isolated from your dev store; if it fails, stop rather than let a
-fixture delete real data.
+`STORE=blob npm test` runs the same suite against Vercel Blob rather than local
+files, using `DANGEROUS_BLOB_TOKEN` from `.env.test.local`. The store backends
+themselves are the SDK's, and their cross-backend contract is tested there.
+`test/environment.test.ts` asserts the suite is isolated from your dev store and
+from any real Blob store; if it fails, stop rather than let a fixture delete
+real data.
 
 ## Setup (local)
 
@@ -49,9 +50,13 @@ has a site and an app, and the manifest is served from the origin either way.
 - `src/app/api/purchases/` — the money. `route.ts` buys and lists; `[id]/consume`
   pays out. Replacing the loot box with another product is expected; keep the
   money-path rules below.
-- `src/lib/store/` — durable state; see Storage.
-- `src/app/devtools.tsx` — dev-only overlay reporting treasury, storage, name,
-  and RPC. Not the product; replace or delete it freely.
+- `src/lib/store.ts` — this app's durable state; see Storage.
+
+Everything that is not this app comes from `@joinbankroll/sdk` and updates with
+`npm update` rather than being edited here: sessions, origin, and the manifest
+route from `/next`; the treasury, charge confirmation, and payouts from
+`/server`; the store backends from `/store`; the dev overlay and host hooks from
+`/react`.
 
 ## Money-path rules
 
@@ -77,7 +82,7 @@ Skipping the payee check is the common, expensive bug: a transfer the user sent
 to their own second wallet passes the other two.
 
 **3. One atomic write both records the purchase and guards the replay.** The id
-is derived from the transaction (`buildId(charge.slot, signature)`), so a second
+is derived from the transaction (`sortableId(charge.slot, signature)`), so a second
 attempt computes the same id and the create fails — there is no separate "spend
 the signature" step to leave half-finished.
 
@@ -96,9 +101,10 @@ retry an unknown outcome; only `expired` and `send_failed` prove no money moved.
 
 ## Storage
 
-`src/lib/store/` — two backends behind one interface (`backend.ts`): local files
-in development, Vercel Blob when deployed, chosen by `STORE`. Nothing outside the
-directory knows which is live, so the same code deploys unchanged.
+`src/lib/store.ts` — this app's Purchase model. The backends behind it are
+`@joinbankroll/sdk/store/fs` and `/store/vercel`: local files in development,
+Vercel Blob when deployed, chosen by `STORE`. Nothing above the interface knows
+which is live, so the same code deploys unchanged.
 
 - `createIfAbsent()` — atomic create that fails if the path exists (rule 3's guard)
 - `writeJson(..., ifMatch)` — compare-and-swap, throws `PreconditionFailed` on a
