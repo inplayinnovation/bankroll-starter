@@ -11,7 +11,6 @@
     "test": "vitest run",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node scripts/welcome.mjs || exit 0",
     "token": "bankroll token"
   },
   "dependencies": {
