@@ -10,13 +10,16 @@
 // after that leaves the purchase `consuming` with its transaction stored, and
 // calling consume again resumes from those exact bytes — a byte-identical
 // re-broadcast is one transfer with one signature, so resuming can't pay twice.
-import '@/lib/rpc';
+import { requireIdentity, requireSession, Unauthorized } from '@joinbankroll/sdk/next';
+import {
+  PayError,
+  buildPayout,
+  confirmPayout,
+  requireTreasury,
+  sendPayout,
+} from '@joinbankroll/sdk/server';
 
-import { PayError, buildPayout, confirmPayout, sendPayout } from '@joinbankroll/sdk/server';
-
-import { requireIdentity, requireSession, Unauthorized } from '@/lib/session';
 import { getPurchase, updatePurchase } from '@/lib/store';
-import { requireTreasury } from '@/lib/treasury';
 
 class NotConsumable extends Error {
   constructor(status: string) {

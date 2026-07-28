@@ -4,23 +4,18 @@
 // holds the user's money, identity, and location. This app just sells loot
 // boxes and remembers what was bought. Everything here runs inside the Bankroll
 // app; in a plain browser it tells a developer where to go instead.
-import { useState, useSyncExternalStore } from 'react';
+import { useState } from 'react';
 
 import {
   buy,
   open,
+  useBankrollChecked,
   useBankrollStatus,
   useMe,
   usePurchases,
   verifyIdentity,
   type Purchase,
 } from '@/lib/client/bankroll';
-
-// Distinguishes "rendered on the server" from "running in the browser" without
-// an effect: the server snapshot is false, the client snapshot true.
-const neverChanges = () => () => {};
-const onClient = () => true;
-const onServer = () => false;
 
 export function Shop({ ready, devTools }: { ready: boolean; devTools?: React.ReactNode }) {
   const status = useBankrollStatus();
@@ -33,7 +28,7 @@ export function Shop({ ready, devTools }: { ready: boolean; devTools?: React.Rea
   // 'unavailable'. Deciding anything on that would flash "open this in Bankroll"
   // at a phone that is already inside Bankroll, until hydration corrects it —
   // so wait until the status has actually been looked at.
-  const checked = useSyncExternalStore(neverChanges, onClient, onServer);
+  const checked = useBankrollChecked();
 
   if (!checked) return <Loading />;
 

@@ -6,9 +6,9 @@
 // installing the app for someone who doesn't have it. Linking there beats
 // reimplementing any of it.
 import { playLink } from '@joinbankroll/sdk';
+import { publicOrigin } from '@joinbankroll/sdk/next';
 
 import { APP_PATH, appName } from '@/lib/app-identity';
-import { publicOrigin } from '@/lib/origin';
 
 export const dynamic = 'force-dynamic';
 

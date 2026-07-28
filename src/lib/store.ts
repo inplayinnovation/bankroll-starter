@@ -1,59 +1,40 @@
-// Durable state — no database to provision.
+// What this app remembers: one document per purchase.
 //
-// Two backends, one interface (see ./backend.ts). Local development writes
-// files so the app runs without a Vercel account; a deployment uses Vercel
-// Blob. Nothing below this line knows which is live, which is what lets the
-// same code deploy unchanged.
+// The store itself — the backend interface, the compare-and-swap, the id scheme
+// — is @joinbankroll/sdk/store. What's here is only this app's domain: a loot
+// box, who bought it, and whether it's been opened. Replace it with whatever
+// you're selling; a chess app has games and winners, not purchases.
 //
-// One document per purchase, and every state change is a compare-and-swap on
-// that one document. That is the whole reason this is safe on a store with no
-// transactions: nothing here spans two keys, so there is never a pair to keep
-// in step and no window to be interrupted in.
+// Every state change is a compare-and-swap on one document. That is the whole
+// reason this is safe on a store with no transactions: nothing here spans two
+// keys, so there is never a pair to keep in step and no window to be
+// interrupted in.
 //
-// Note what is absent: a balance. The app does not hold anyone's money — the
-// Bankroll host is the wallet. The app sells things and remembers what was
-// bought, which is one document per sale.
-import { PreconditionFailed, type StoreBackend } from './backend';
-import { blobBackend } from './blob';
-import { fsBackend, storeDirectory } from './fs';
-
-const FILESYSTEM_STORE = 'fs';
-const CAS_ATTEMPTS = 5;
+// Note what is absent: a balance. This app does not hold anyone's money — the
+// Bankroll host is the wallet. It sells things and remembers what was bought.
+import {
+  DocumentNotFound,
+  sortableId,
+  updateJson,
+  type StoreBackend,
+} from '@joinbankroll/sdk/store';
+import { fsBackend, storeDirectory } from '@joinbankroll/sdk/store/fs';
+import { vercelBlobBackend } from '@joinbankroll/sdk/store/vercel';
 
 // Set by `npm run bankroll` in .env.local, which is gitignored — so a
 // deployment never sees it and always gets Blob.
-const backend: StoreBackend = process.env.STORE === FILESYSTEM_STORE ? fsBackend : blobBackend;
+const FILESYSTEM_STORE = 'fs';
 
 export const usingFilesystemStore = () => process.env.STORE === FILESYSTEM_STORE;
 
-/** Where filesystem-backed data lives, for display. Re-exported so callers
- *  never hardcode the path — it moved once already. */
+const backend: StoreBackend = usingFilesystemStore() ? fsBackend() : vercelBlobBackend();
+
+/** Where filesystem-backed data lives, for display. */
 export { storeDirectory };
 
 // A purchase's id is `<invertedSlot>-<signature>`, and its document lives at
-// `purchases/<wallet>/<id>.json`. Both parts come from the transaction, so the
-// id is the same on every attempt — which is what makes the create the replay
-// guard. And because a listing can only order by key, the slot goes first: an
-// object store sorts keys lexicographically, so inverting the slot (largest
-// first) makes a listing come back newest-first without any post-sort.
-//
-// The signature sits *after* the slot, so it isn't a key prefix — a caller can
-// only look a purchase up by its full id, which the write path returns and the
-// list carries. Recovering a purchase from a bare signature (support: "I paid,
-// here's my tx") is a route-layer concern: confirmCharge yields the slot, and
-// buildId rebuilds the id. The store stays off the chain.
-//
-// Slots are u64 on-chain but the SDK surfaces them as a JS number, so
-// MAX_SAFE_INTEGER is the ceiling and 16 digits is its width.
-const SLOT_CEILING = Number.MAX_SAFE_INTEGER;
-const SLOT_WIDTH = String(SLOT_CEILING).length;
-
-export function buildId(slot: number, signature: string): string {
-  return `${String(SLOT_CEILING - slot).padStart(SLOT_WIDTH, '0')}-${signature}`;
-}
-
-// Segments come from wallet addresses and ids, so they are encoded rather than
-// trusted to be free of separators.
+// `purchases/<wallet>/<id>.json`. Segments come from wallet addresses and ids,
+// so they are encoded rather than trusted to be free of separators.
 const purchasePath = (wallet: string, id: string) =>
   `purchases/${encodeURIComponent(wallet)}/${encodeURIComponent(id)}.json`;
 const walletPrefix = (wallet: string) => `purchases/${encodeURIComponent(wallet)}/`;
@@ -122,7 +103,7 @@ export async function recordPurchase(
   mint: string,
   meta?: Record<string, unknown>,
 ): Promise<{ created: boolean; purchase: Purchase }> {
-  const id = buildId(slot, signature);
+  const id = sortableId(slot, signature);
   const pathname = purchasePath(wallet, id);
   const purchase: Purchase = {
     id,
@@ -186,19 +167,11 @@ export async function updatePurchase(
   id: string,
   change: (current: Purchase) => Purchase,
 ): Promise<Purchase> {
-  const pathname = purchasePath(wallet, id);
-  for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
-    const stored = await backend.readJson<Purchase>(pathname);
-    if (!stored) throw new PurchaseNotFound(id);
-    const next = change(stored.value);
-    try {
-      await backend.writeJson(pathname, next, stored.etag);
-      return next;
-    } catch (error) {
-      // Someone else transitioned it — re-read and decide again against theirs.
-      if (error instanceof PreconditionFailed) continue;
-      throw error;
-    }
+  try {
+    return await updateJson<Purchase>(backend, purchasePath(wallet, id), change);
+  } catch (error) {
+    // The store speaks in pathnames; callers here speak in purchase ids.
+    if (error instanceof DocumentNotFound) throw new PurchaseNotFound(id);
+    throw error;
   }
-  throw new Error(`purchase ${id} is too contended to update`);
 }

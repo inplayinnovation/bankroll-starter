@@ -3,12 +3,12 @@
 //
 // Replace this with whatever you're building; the money flow it demonstrates
 // (charge → confirm → credit, and pay out) is the part worth keeping.
-import { appName, appNameConfigured } from '@/lib/app-identity';
-import { rpcUrl, usingPublicRpc } from '@/lib/rpc';
-import { storeDirectory, usingFilesystemStore } from '@/lib/store';
-import { treasuryAddress } from '@/lib/treasury';
+import { DevTools, type DevRow } from '@joinbankroll/sdk/react';
+import { rpcUrl, treasuryAddress, usingPublicRpc } from '@joinbankroll/sdk/server';
 
-import { DevTools, type DevRow } from '../devtools';
+import { appName, appNameConfigured } from '@/lib/app-identity';
+import { storeDirectory, usingFilesystemStore } from '@/lib/store';
+
 import { Shop } from '../shop';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,7 @@ export default function App() {
     },
     {
       label: 'Storage',
-      value: onFilesystem ? storeDirectory : storage ? 'Vercel Blob' : 'no Blob store',
+      value: onFilesystem ? storeDirectory() : storage ? 'Vercel Blob' : 'no Blob store',
       ok: storage,
     },
     { label: 'Name', value: appName(), ok: appNameConfigured() },

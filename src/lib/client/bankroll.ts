@@ -1,32 +1,15 @@
 'use client';
 
-// The client half: talking to the Bankroll app that hosts this page.
-import { bankroll, BankrollError, withBankrollToken, type BankrollStatus } from '@joinbankroll/sdk';
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+// This app's client half: what it sells and how it asks for it.
+//
+// Talking to the host — attaching the session token, knowing whether Bankroll
+// is even there, sending someone through verification — is the same in every
+// app, so it comes from @joinbankroll/sdk/react rather than living here.
+import { bankroll, BankrollError } from '@joinbankroll/sdk';
+import { bankrollFetch } from '@joinbankroll/sdk/react';
+import { useCallback, useEffect, useState } from 'react';
 
-/**
- * Every authenticated request carries the session token. `fetch` is bound
- * because it throws when called detached from the window.
- */
-export const bankrollFetch = withBankrollToken(
-  typeof window === 'undefined' ? fetch : fetch.bind(window),
-);
-
-// The host is injected before the page loads and never changes afterwards, so
-// there is nothing to subscribe to. On the server there is no host, which is
-// the same answer a plain browser tab gets — so server and client agree and
-// the gate always renders something rather than blanking.
-const noSubscribe = () => () => {};
-const unavailable = (): BankrollStatus => 'unavailable';
-
-/**
- * Host status: 'ready' inside a current Bankroll app, 'update_required' inside
- * one too old for this SDK, 'unavailable' anywhere else — including during
- * server render.
- */
-export function useBankrollStatus(): BankrollStatus {
-  return useSyncExternalStore(noSubscribe, bankroll.status, unavailable);
-}
+export { bankrollFetch, useBankrollChecked, useBankrollStatus, verifyIdentity } from '@joinbankroll/sdk/react';
 
 export interface Me {
   username: string;
@@ -145,17 +128,6 @@ export async function open(id: string): Promise<{ ok: boolean; error?: string }>
   if (response.ok || response.status === 202) return { ok: true };
   const body = (await response.json()) as { error?: string };
   return { ok: false, error: body.error ?? 'could not open' };
-}
-
-/** Verify identity — real money moves only for a verified person. */
-export async function verifyIdentity(): Promise<boolean> {
-  try {
-    await bankroll.session({ identity: true });
-    return true;
-  } catch (error) {
-    if (error instanceof BankrollError) return false;
-    throw error;
-  }
 }
 
 // The loot box price, in cents — matches the server's PRICE_CENTS.

@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { HSUSD_MINT } from '@joinbankroll/sdk/server';
+import { sortableId } from '@joinbankroll/sdk/store';
 import { describe, expect, it } from 'vitest';
 
 import {
-  buildId,
   getPurchase,
   listPurchases,
   PurchaseNotFound,
@@ -23,7 +23,7 @@ describe('recordPurchase', () => {
     const s = signature();
     const { created, purchase } = await recordPurchase(w, s, 1000, 100, HSUSD_MINT);
     expect(created).toBe(true);
-    expect(purchase.id).toBe(buildId(1000, s));
+    expect(purchase.id).toBe(sortableId(1000, s));
     expect(purchase.status).toBe('unconsumed');
     expect(purchase.amountCents).toBe(100);
   });
@@ -58,7 +58,7 @@ describe('getPurchase', () => {
   });
 
   it('returns null for an unknown id', async () => {
-    expect(await getPurchase(wallet(), buildId(1, signature()))).toBeNull();
+    expect(await getPurchase(wallet(), sortableId(1, signature()))).toBeNull();
   });
 });
 
@@ -115,7 +115,7 @@ describe('updatePurchase', () => {
   });
 
   it('throws for an unknown id', async () => {
-    await expect(updatePurchase(wallet(), buildId(1, signature()), (p) => p)).rejects.toThrow(
+    await expect(updatePurchase(wallet(), sortableId(1, signature()), (p) => p)).rejects.toThrow(
       PurchaseNotFound,
     );
   });

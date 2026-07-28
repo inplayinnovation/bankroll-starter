@@ -4,14 +4,16 @@
 // product, so what's on show is the money loop and the store, not the thing
 // being sold. Replace the loot box with whatever you're building; the shape of
 // these routes is the part worth keeping.
-import { ConfirmChargeError, confirmCharge, HSUSD_MINT } from '@joinbankroll/sdk/server';
-
-import '@/lib/rpc';
+import { requireIdentity, requireSession, Unauthorized } from '@joinbankroll/sdk/next';
+import {
+  ConfirmChargeError,
+  confirmCharge,
+  HSUSD_MINT,
+  requireTreasury,
+} from '@joinbankroll/sdk/server';
 
 import { appTokenMint } from '@/lib/app-identity';
-import { requireIdentity, requireSession, Unauthorized } from '@/lib/session';
 import { listPurchases, recordPurchase } from '@/lib/store';
-import { requireTreasury } from '@/lib/treasury';
 
 // One price, because the demo is about the money loop rather than a catalogue.
 export const PRICE_CENTS = 100;

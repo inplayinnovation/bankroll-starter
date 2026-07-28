@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { storeRoot } from '@/lib/store/fs';
+import { storeDirectory } from '@joinbankroll/sdk/store/fs';
 
 // Not tests of the app — tests of the assumptions the rest of the suite rests
 // on. Each backend is kept away from real data by a different mechanism, and
@@ -17,8 +17,8 @@ describe('test environment', () => {
   });
 
   it.runIf(process.env.STORE === 'fs')('keeps filesystem data out of the dev store', () => {
-    expect(storeRoot).toContain('/bankroll/test');
-    expect(storeRoot).not.toContain('/bankroll/development');
+    expect(storeDirectory()).toBe('bankroll/test');
+    expect(storeDirectory()).not.toContain('development');
   });
 
   it.runIf(process.env.STORE === 'blob')('only ever reaches a throwaway Blob store', () => {
