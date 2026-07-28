@@ -1,7 +1,7 @@
 import { getSession } from '@joinbankroll/sdk/next';
 import { treasuryAddress } from '@joinbankroll/sdk/server';
 
-import { appTokenMint, appTokenName } from '@/lib/app-identity';
+import { appTokens } from '@/lib/app-identity';
 
 export async function GET(request: Request) {
   const session = await getSession(request);
@@ -20,9 +20,12 @@ export async function GET(request: Request) {
     // host didn't report one.
     geo: session.geo ?? null,
     treasuryConfigured: treasuryAddress() !== null,
-    // The app's own token, when it issues one, so the client can offer paying
-    // with it. Naming the mint here is safe: the manifest already declares it
-    // publicly, and that declaration is what bounds what this app may charge.
-    appToken: appTokenMint() ? { mint: appTokenMint()!, name: appTokenName() } : null,
+    // The app's own tokens, so the client can offer paying with them. Naming
+    // the mints here is safe: the manifest already declares them publicly, and
+    // that declaration is what bounds what this app may charge.
+    appTokens: Object.entries(appTokens()).map(([mint, token]) => ({
+      mint,
+      name: token.name ?? 'App Tokens',
+    })),
   });
 }

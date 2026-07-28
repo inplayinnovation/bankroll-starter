@@ -14,15 +14,20 @@ export const appNameConfigured = (): boolean => Boolean(process.env.BANKROLL_APP
 // landing page, not the app.
 export const APP_PATH = '/app';
 
-// Your own token, if you issue one: a mint you created and hand out for free —
-// promo credit, or funds for testing. Set BANKROLL_APP_TOKEN_MINT and the
-// manifest declares it, which is what lets a charge settle in it and what makes
-// Bankroll show it as this app's funds rather than an unattributed holding.
+// The tokens you issue: mints you created and hand out for free — promo credit,
+// or funds for testing. Declaring one in the manifest is what lets a charge
+// settle in it, and what makes Bankroll show it as this app's funds rather than
+// an unattributed holding.
 //
-// Mint it with 9 decimals and treat one token as one dollar; that is the only
-// shape charges settle in. It is worth nothing outside your app, which is the
-// point — you can give away as much as you like, and it can never be cashed out.
-export const appTokenMint = (): string | null => process.env.BANKROLL_APP_TOKEN_MINT || null;
+// They live in app-tokens.json at the project root, which IS the manifest's
+// `appTokens` claim — so this file is config, not a translation layer.
+// `bankroll token create` mints one and adds it here.
+//
+// Worth nothing outside your app, which is the point: you can give away as much
+// as you like, and it can never be cashed out.
+import tokens from '../../app-tokens.json';
 
-export const appTokenName = (): string =>
-  process.env.BANKROLL_APP_TOKEN_NAME || `${appName()} Tokens`;
+export const appTokens = (): Record<string, { name?: string; description?: string }> => tokens;
+
+/** Every mint this app accepts alongside HSUSD — the money path's allowlist. */
+export const appTokenMints = (): string[] => Object.keys(tokens);

@@ -12,7 +12,7 @@
 import { manifestRoute } from '@joinbankroll/sdk/next';
 import { treasuryAddress } from '@joinbankroll/sdk/server';
 
-import { APP_PATH, appName, appTokenMint, appTokenName } from '@/lib/app-identity';
+import { APP_PATH, appName, appTokens } from '@/lib/app-identity';
 
 // Required: the manifest is built from the request's own host, so it must not
 // be prerendered. The SDK cannot declare this for you — Next only reads it from
@@ -23,6 +23,5 @@ export const GET = manifestRoute({
   launch: APP_PATH,
   name: appName,
   payments: treasuryAddress,
-  tokenMint: appTokenMint,
-  tokenName: appTokenName,
+  appTokens,
 });

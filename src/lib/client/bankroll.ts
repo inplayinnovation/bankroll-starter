@@ -20,8 +20,8 @@ export interface Me {
   /** Where the user is for this session — not where they live. */
   geo: string | null;
   treasuryConfigured: boolean;
-  /** This app's own token, when it issues one. Null when it doesn't. */
-  appToken: { mint: string; name: string } | null;
+  /** This app's own tokens. Empty when it issues none. */
+  appTokens: { mint: string; name: string }[];
 }
 
 async function fetchMe(): Promise<Me | null> {

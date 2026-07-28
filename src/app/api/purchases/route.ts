@@ -12,7 +12,7 @@ import {
   requireTreasury,
 } from '@joinbankroll/sdk/server';
 
-import { appTokenMint } from '@/lib/app-identity';
+import { appTokenMints } from '@/lib/app-identity';
 import { listPurchases, recordPurchase } from '@/lib/store';
 
 // One price, because the demo is about the money loop rather than a catalogue.
@@ -48,11 +48,11 @@ export async function POST(request: Request) {
     //    costing them cents to create — buys a box and is paid out in real
     //    HSUSD. Only HSUSD and this app's own token are ever accepted, and
     //    which one paid is recorded so opening returns the same asset.
-    const tokenMint = appTokenMint();
+    const accepted = appTokenMints();
     if (charge.payee !== treasury.address) {
       return Response.json({ error: 'payment went to another address' }, { status: 400 });
     }
-    if (charge.mint !== HSUSD_MINT && charge.mint !== tokenMint) {
+    if (charge.mint !== HSUSD_MINT && !accepted.includes(charge.mint)) {
       return Response.json({ error: 'payment was made in another asset' }, { status: 400 });
     }
     if (charge.amountCents !== PRICE_CENTS) {

@@ -15,7 +15,7 @@
     "postinstall": "node scripts/welcome.mjs || exit 0"
   },
   "dependencies": {
-    "@joinbankroll/sdk": "^0.7.0",
+    "@joinbankroll/sdk": "^0.8.0",
     "@vercel/blob": "^2.3.0",
     "next": "^16.0.0",
     "react": "^19.0.0",
