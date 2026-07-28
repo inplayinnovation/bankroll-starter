@@ -160,7 +160,16 @@ function LootBox({
           Open
         </button>
       )}
-      {purchase.status === 'consuming' && <Tag>paying…</Tag>}
+      {/* A payout that expired never landed and never will, so this is safe to
+          try again — and has to be, or the box sits on "paying…" forever. */}
+      {purchase.status === 'consuming' &&
+        (purchase.payout?.error ? (
+          <button className="btn" disabled={busy} onClick={onOpen}>
+            Retry payout
+          </button>
+        ) : (
+          <Tag>paying…</Tag>
+        ))}
       {purchase.status === 'consumed' && <span className="text-sm text-emerald-400">+$1.00 ✓</span>}
       {purchase.status === 'failed' && <span className="text-sm text-amber-400">failed</span>}
     </li>

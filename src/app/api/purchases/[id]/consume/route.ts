@@ -10,6 +10,10 @@
 // after that leaves the purchase `consuming` with its transaction stored, and
 // calling consume again resumes from those exact bytes — a byte-identical
 // re-broadcast is one transfer with one signature, so resuming can't pay twice.
+//
+// The exception is a transaction whose blockhash expired. That one can never
+// land, so resuming it would leave the purchase `consuming` forever; it gets
+// rebuilt instead, which is safe because expiry proves nothing moved.
 import { requireIdentity, requireSession, Unauthorized } from '@joinbankroll/sdk/next';
 import {
   PayError,
@@ -49,7 +53,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // concurrent caller already started, keep their recorded transaction — the
     // bytes that get sent must be the ones that got stored, so a resume and a
     // race broadcast the identical transfer.
-    if (purchase.status === 'unconsumed') {
+    //
+    // Unless that transaction is dead. A payout can only land while its
+    // blockhash is valid, and past that no amount of re-broadcasting will
+    // change the answer — so rebuild rather than resume, or the purchase is
+    // stuck in `consuming` forever. Safe precisely because `expired` is the one
+    // outcome that proves no money moved.
+    const expired = purchase.payout?.error === 'expired';
+
+    if (purchase.status === 'unconsumed' || expired) {
       // Pay back in the asset that paid. A box bought with this app's own token
       // returns that token, never HSUSD — otherwise credit the app gives away
       // for free would be a route to real money.
@@ -63,8 +75,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         { signer },
       );
       purchase = await updatePurchase(wallet, id, (current) => {
-        if (current.status === 'consuming') return current;
-        if (current.status !== 'unconsumed') throw new NotConsumable(current.status);
+        // Someone else recorded a live payout first — take theirs, so only one
+        // transaction is ever in flight.
+        if (current.status === 'consuming' && current.payout?.error !== 'expired') return current;
+        if (current.status !== 'unconsumed' && current.status !== 'consuming') {
+          throw new NotConsumable(current.status);
+        }
         return {
           ...current,
           status: 'consuming',

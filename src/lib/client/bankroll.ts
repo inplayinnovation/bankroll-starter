@@ -55,6 +55,12 @@ export interface Purchase {
   amountCents: number;
   status: 'unconsumed' | 'consuming' | 'consumed' | 'failed';
   purchasedAt: string;
+  /**
+   * Set when a payout was broadcast but did not confirm. `expired` means it
+   * never landed and never will, so opening again is safe and rebuilds it —
+   * without this the UI cannot tell a payout in flight from a dead one.
+   */
+  payout?: { error?: string };
 }
 
 async function fetchPurchases(): Promise<Purchase[]> {
@@ -123,9 +129,11 @@ export async function open(id: string): Promise<{ ok: boolean; error?: string }>
   const response = await bankrollFetch(`/api/purchases/${encodeURIComponent(id)}/consume`, {
     method: 'POST',
   });
-  // 202 means the payout was broadcast but not yet confirmed — it may still
-  // land, so it counts as underway rather than failed.
-  if (response.ok || response.status === 202) return { ok: true };
+  // 202 means the payout was broadcast but did not confirm in time. It may
+  // still land, so this is not a failure — but it is not done either, and
+  // saying nothing leaves the box sitting on "paying…" with no explanation.
+  if (response.status === 202) return { ok: false, error: 'still settling — try again shortly' };
+  if (response.ok) return { ok: true };
   const body = (await response.json()) as { error?: string };
   return { ok: false, error: body.error ?? 'could not open' };
 }
