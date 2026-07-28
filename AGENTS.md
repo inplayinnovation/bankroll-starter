@@ -50,8 +50,8 @@ has a site and an app, and the manifest is served from the origin either way.
   pays out. Replacing the loot box with another product is expected; keep the
   money-path rules below.
 - `src/lib/store/` — durable state; see Storage.
-- `src/app/devtools.tsx` (dev-only overlay) and `src/app/setup/` (config status)
-  are not the product — replace or delete them freely.
+- `src/app/devtools.tsx` — dev-only overlay reporting treasury, storage, name,
+  and RPC. Not the product; replace or delete it freely.
 
 ## Money-path rules
 

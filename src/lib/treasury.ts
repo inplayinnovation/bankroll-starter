@@ -29,7 +29,7 @@ export function treasuryAddress(): string | null {
 export function requireTreasury(): PaymentSigner {
   const signer = treasurySigner();
   if (!signer) {
-    throw new Error('No treasury — set BANKROLL_TREASURY_KEY (see /setup)');
+    throw new Error('No treasury — set BANKROLL_TREASURY_KEY (see AGENTS.md)');
   }
   return signer;
 }

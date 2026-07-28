@@ -76,7 +76,7 @@ function qrLines(text) {
 
 // Solana's public endpoint. Fine to develop against, rate-limited, and the one
 // thing here worth upgrading later — so it's offered with a default rather than
-// left for someone to discover in /setup.
+// left for someone to discover.
 const PUBLIC_MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 
 // A Solana secret key is just the 32-byte ed25519 seed followed by the 32-byte

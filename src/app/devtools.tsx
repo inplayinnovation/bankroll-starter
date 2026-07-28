@@ -5,7 +5,8 @@
 // Outside the host there's nothing to overlay — the app can't run, so the page
 // is the QR code instead. Inside it, the app works and what a developer wants
 // is the state behind it: which treasury is signing, where data is going, which
-// RPC. That's the old /setup content, moved to where the app actually runs.
+// RPC. It is the only place that reports configuration, and it reports it where
+// the app actually runs.
 //
 // Next's own indicator sits bottom-left by default, so this takes bottom-right.
 import { useEffect, useState } from 'react';

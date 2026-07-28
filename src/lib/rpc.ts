@@ -3,8 +3,8 @@
 // SOLANA_RPC_URL is the upgrade, not a requirement to get started.
 export const PUBLIC_MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 
-// Recorded before the default is applied below, so /setup can still tell you
-// whether you're on your own endpoint or ours.
+// Recorded before the default is applied below, so the dev overlay can still
+// tell you whether you're on your own endpoint or ours.
 const configured = Boolean(process.env.SOLANA_RPC_URL);
 
 export const usingPublicRpc = (): boolean => !configured;

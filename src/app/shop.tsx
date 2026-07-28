@@ -4,7 +4,6 @@
 // holds the user's money, identity, and location. This app just sells loot
 // boxes and remembers what was bought. Everything here runs inside the Bankroll
 // app; in a plain browser it tells a developer where to go instead.
-import Link from 'next/link';
 import { useState, useSyncExternalStore } from 'react';
 
 import {
@@ -43,9 +42,10 @@ export function Shop({ ready, devTools }: { ready: boolean; devTools?: React.Rea
     return (
       <Screen title="Bankroll Starter">
         <p>This app isn&apos;t finished setting up yet, so it can&apos;t take or send money.</p>
-        <Link className="text-sm text-neutral-500 underline" href="/setup">
-          What&apos;s missing
-        </Link>
+        <p className="text-sm text-neutral-500">
+          Ask your coding agent to set it up — it&apos;ll find what it needs in{' '}
+          <code>AGENTS.md</code>.
+        </p>
       </Screen>
     );
   }
