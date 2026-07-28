@@ -1,5 +1,5 @@
-// create-next-app runs `npm install` right after cloning this template, so
-// npm's postinstall hook is the one moment we can greet someone who has never
+// create-bankroll-app runs `npm install` right after downloading this template,
+// so npm's postinstall hook is the one moment we can greet someone who has never
 // seen the project before — and point them at the command that actually gets
 // the app onto a phone.
 //

@@ -5,14 +5,14 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
-    "bankroll": "node scripts/bankroll.mjs",
-    "mint-token": "node scripts/mint-token.mjs",
+    "bankroll": "bankroll dev",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node scripts/welcome.mjs || exit 0"
+    "postinstall": "node scripts/welcome.mjs || exit 0",
+    "token": "bankroll token"
   },
   "dependencies": {
     "@joinbankroll/sdk": "^0.8.0",
@@ -22,16 +22,13 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@solana/web3.js": "1.98.4",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "bs58": "6.0.0",
-    "cloudflared": "^0.7.1",
+    "bankroll-cli": "^0.1.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.0.0",
-    "qrcode-generator": "^2.0.4",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
