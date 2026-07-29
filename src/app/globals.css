@@ -8,6 +8,22 @@ body {
   @apply bg-neutral-950 text-neutral-100 antialiased;
 }
 
+/* The app runs inside the Bankroll host's webview, on a phone whose OS reserves
+   the top for a notch or status bar and the bottom for the home indicator.
+   Padding to at least the inset keeps content out from under both, and falls
+   back to the plain spacing on anything without them — a desktop browser, or an
+   older phone.
+
+   This only works together with viewport-fit=cover in the layout's viewport
+   export: without it every env(safe-area-inset-*) resolves to zero and this
+   silently becomes ordinary padding. */
+.safe-area {
+  padding-top: max(2.5rem, env(safe-area-inset-top));
+  padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+
 .btn {
   @apply rounded-lg bg-neutral-100 px-4 py-2.5 text-center font-medium text-neutral-950
     transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40;
