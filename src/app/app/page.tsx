@@ -1,15 +1,17 @@
 // The app itself — what Bankroll loads when a user opens it. `/` is the
 // landing page that sends them here, the same split a real app has.
 //
-// Replace this with whatever you're building; the money flow it demonstrates
-// (charge → confirm → credit, and pay out) is the part worth keeping.
+// This page stays a shell: it works out whether the app is configured, builds
+// the developer rows, and renders one component. Swap that component for yours;
+// what it demonstrates (charge → confirm → record, and pay out) is the part
+// worth keeping.
 import { DevTools, type DevRow } from '@joinbankroll/sdk/react';
 import { rpcUrl, treasuryAddress, usingPublicRpc } from '@joinbankroll/sdk/server';
 
 import { appName, appNameConfigured } from '@/lib/app-identity';
 import { storeDirectory, usingFilesystemStore } from '@/lib/store';
 
-import { Shop } from '../shop';
+import { Demo } from '../demo';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +47,8 @@ export default function App() {
   ];
 
   // Developer tools overlay the app only inside Bankroll, where it actually
-  // runs — see devtools.tsx.
+  // runs, and only in development.
   const devTools = process.env.NODE_ENV === 'development' ? <DevTools rows={rows} /> : null;
 
-  return <Shop ready={ready} devTools={devTools} />;
+  return <Demo ready={ready} devTools={devTools} />;
 }

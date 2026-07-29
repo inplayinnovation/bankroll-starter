@@ -31,9 +31,8 @@ real data.
 ## Setup (local)
 
 **Local development needs nothing.** `npm create @joinbankroll/app` writes
-`.env.local` — `STORE=fs`, the app name, and an RPC — and starts the app.
-`npm run dev` picks it back up: a tunnel, and a QR that opens the app
-on a phone.
+`.env.local` — `STORE=fs`, the app name, and an RPC. `npm run dev` takes it from
+there: a tunnel, and a QR that opens the app on a phone.
 
 The key that receives payments and signs payouts lives at
 `~/.config/bankroll/keypair.json`, created on first use and injected into the
@@ -50,11 +49,15 @@ always means a dead tunnel.
 link. `/app` is the app itself, what the host loads. Keep the split: a real app
 has a site and an app, and the manifest is served from the origin either way.
 
-- `src/app/shop.tsx` — the app's surface (buy, list, consume). Rename it, but
-  it is not a wallet: the host is.
-- `src/app/api/purchases/` — the money. `route.ts` buys and lists; `[id]/consume`
-  pays out. Replacing the loot box with another product is expected; keep the
-  money-path rules below.
+What ships is a demo rather than a product: it displays the session claims, then
+charges $1 and pays the same $1 back so both directions of the money loop are
+visible. Replacing it with the thing you're actually selling is expected — the
+money-path rules below are what carries over.
+
+- `src/app/demo.tsx` — the app's surface. Delete it and render your own from
+  `/app`, which stays a thin shell. It is not a wallet: the host is.
+- `src/app/api/charges/` — the money. `route.ts` takes a charge and lists them;
+  `[id]/payout` pays one back out.
 - `src/lib/store.ts` — this app's durable state; see Storage.
 
 Everything that is not this app comes from `@joinbankroll/sdk` and updates with
@@ -86,32 +89,32 @@ if (charge.payer !== session.user.wallet) return reject();
 Skipping the payee check is the common, expensive bug: a transfer the user sent
 to their own second wallet passes the other two.
 
-**3. One atomic write both records the purchase and guards the replay.** The id
+**3. One atomic write both records the charge and guards the replay.** The id
 is derived from the transaction (`sortableId(charge.slot, signature)`), so a second
 attempt computes the same id and the create fails — there is no separate "spend
 the signature" step to leave half-finished.
 
 ```ts
-const { created, purchase } = await recordPurchase(wallet, signature, charge.slot, charge.amountCents);
+const { created, charge } = await recordCharge(wallet, signature, slot, amountCents, mint);
 // created === false means a retry or replay — already satisfied, not an error.
 ```
 
-**4. Consuming pays out, on the purchase's own document.** The whole payout
-lifecycle is compare-and-swap on one key, so nothing spans two documents. The
-`unconsumed → consuming` transition records the built transaction *before*
-broadcast; a stuck `consuming` purchase resumes from those exact bytes when
-consume is called again (a byte-identical rebroadcast is one transfer, so it
-can't pay twice). On `PayError` the purchase stays `consuming` — never blind-
-retry an unknown outcome; only `expired` and `send_failed` prove no money moved.
+**4. The payout runs on the charge's own document.** The whole payout lifecycle
+is compare-and-swap on one key, so nothing spans two documents. The
+`held → paying` transition records the built transaction *before* broadcast; a
+stuck `paying` charge resumes from those exact bytes when the payout is called
+again (a byte-identical rebroadcast is one transfer, so it can't pay twice). On
+`PayError` the charge stays `paying` — never blind-retry an unknown outcome;
+only `expired` and `send_failed` prove no money moved.
 
 The exception is `expired`. That transaction's blockhash has passed, so it can
 never land however many times it is resent — and expiry is exactly what proves
-nothing moved, so consume rebuilds it instead. Without that a purchase sits in
-`consuming` forever and the user is charged with no refund.
+nothing moved, so the route rebuilds it instead. Without that a charge sits in
+`paying` forever and the user is charged with no refund.
 
 ## Storage
 
-`src/lib/store.ts` — this app's Purchase model. The backends behind it are
+`src/lib/store.ts` — this app's Charge model. The backends behind it are
 `@joinbankroll/sdk/store/fs` and `/store/vercel`: local files in development,
 Vercel Blob when deployed, chosen by `STORE`. Nothing above the interface knows
 which is live, so the same code deploys unchanged.
@@ -119,12 +122,12 @@ which is live, so the same code deploys unchanged.
 - `createIfAbsent()` — atomic create that fails if the path exists (rule 3's guard)
 - `writeJson(..., ifMatch)` — compare-and-swap, throws `PreconditionFailed` on a
   lost race (rule 4's transitions)
-- `list(prefix, { limit, cursor })` — a page in ascending key order; purchases
-  key the slot first so a listing is newest-first without a post-sort
+- `list(prefix, { limit, cursor })` — a page in ascending key order; charges key
+  the slot first so a listing is newest-first without a post-sort
 - Blob reads pass `useCache: false`, or they can be 60s stale
 
-One document per purchase at `purchases/<wallet>/<invertedSlot>-<signature>.json`
-— no aggregate to keep in sync, which is what makes it safe on a store with no
+One document per charge at `charges/<wallet>/<invertedSlot>-<signature>.json` —
+no aggregate to keep in sync, which is what makes it safe on a store with no
 transactions. Outgrow it → replace `store/` with Postgres; don't add query
 capability the object store can't back (filter with your own index).
 

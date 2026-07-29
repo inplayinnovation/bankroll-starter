@@ -39,17 +39,17 @@ vi.mock('@joinbankroll/sdk/server', async (original) => {
 
 const WALLET = 'BHMwv26hecfUL8rk9XAjgzcDLXM4CBtr1wKNYhEPhSjV';
 
-const { POST } = await import('@/app/api/purchases/[id]/consume/route');
-const { recordPurchase, getPurchase } = await import('@/lib/store');
+const { POST } = await import('@/app/api/charges/[id]/payout/route');
+const { recordCharge, getCharge } = await import('@/lib/store');
 
-const open = (id: string) =>
+const payOut = (id: string) =>
   POST(new Request('https://app.example/x', { method: 'POST' }), {
     params: Promise.resolve({ id }),
   });
 
-async function buy() {
-  const { purchase } = await recordPurchase(WALLET, randomUUID(), 1, 100, HSUSD_MINT);
-  return purchase.id;
+async function charge() {
+  const { charge } = await recordCharge(WALLET, randomUUID(), 1, 100, HSUSD_MINT);
+  return charge.id;
 }
 
 beforeEach(() => {
@@ -58,67 +58,67 @@ beforeEach(() => {
   sdk.confirmFails = null;
 });
 
-describe('opening a loot box', () => {
-  it('builds one payout and consumes it', async () => {
-    const id = await buy();
-    const response = await open(id);
+describe('paying a charge back out', () => {
+  it('builds one payout and pays it', async () => {
+    const id = await charge();
+    const response = await payOut(id);
 
     expect(response.status).toBe(200);
     expect(sdk.built).toBe(1);
-    expect((await getPurchase(WALLET, id))?.status).toBe('consumed');
+    expect((await getCharge(WALLET, id))?.status).toBe('paid');
   });
 
   // A payout that did not confirm may still land, so the bytes are kept and the
-  // purchase stays open rather than being paid a second time.
-  it('records an unconfirmed payout without consuming it', async () => {
-    const id = await buy();
+  // charge stays open rather than being paid a second time.
+  it('records an unconfirmed payout without marking it paid', async () => {
+    const id = await charge();
     sdk.confirmFails = 'expired';
 
-    const response = await open(id);
+    const response = await payOut(id);
     expect(response.status).toBe(202);
 
-    const purchase = await getPurchase(WALLET, id);
-    expect(purchase?.status).toBe('consuming');
-    expect(purchase?.payout?.error).toBe('expired');
+    const stored = await getCharge(WALLET, id);
+    expect(stored?.status).toBe('paying');
+    expect(stored?.payout?.error).toBe('expired');
   });
 
   // The bug this exists for: an expired transaction can never land, so
-  // re-broadcasting the recorded bytes left the purchase `consuming` forever
-  // and the app showing "paying…" with no way out.
+  // re-broadcasting the recorded bytes left the charge `paying` forever and the
+  // app showing "paying…" with no way out.
   it('rebuilds an expired payout instead of resending it', async () => {
-    const id = await buy();
+    const id = await charge();
     sdk.confirmFails = 'expired';
-    await open(id);
+    await payOut(id);
     expect(sdk.sent).toEqual(['tx-1']);
 
     sdk.confirmFails = null;
-    const retry = await open(id);
+    const retry = await payOut(id);
 
     expect(retry.status).toBe(200);
     // A second build, and the new bytes went out — not the dead ones.
     expect(sdk.built).toBe(2);
     expect(sdk.sent).toEqual(['tx-1', 'tx-2']);
-    expect((await getPurchase(WALLET, id))?.status).toBe('consumed');
+    expect((await getCharge(WALLET, id))?.status).toBe('paid');
   });
 
   // Anything other than expiry leaves the outcome unknown, and rebuilding then
   // could pay twice — so those bytes are resent exactly.
   it('resends the same bytes when the outcome is unknown', async () => {
-    const id = await buy();
+    const id = await charge();
     sdk.confirmFails = 'rpc_error';
-    await open(id);
+    await payOut(id);
 
     sdk.confirmFails = null;
-    await open(id);
+    await payOut(id);
 
     expect(sdk.built).toBe(1);
     expect(sdk.sent).toEqual(['tx-1', 'tx-1']);
   });
 
-  it('is idempotent once consumed', async () => {
-    const id = await buy();
-    await open(id);
-    const again = await open(id);
+  it('is idempotent once paid', async () => {
+    const id = await charge();
+    await payOut(id);
+    const again = await payOut(id);
 
     expect(again.status).toBe(200);
     expect(sdk.built).toBe(1);

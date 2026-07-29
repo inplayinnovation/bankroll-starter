@@ -1,6 +1,6 @@
 'use client';
 
-// This app's client half: what it sells and how it asks for it.
+// This app's client half: the two money calls, and what it knows about you.
 //
 // Talking to the host — attaching the session token, knowing whether Bankroll
 // is even there, sending someone through verification — is the same in every
@@ -48,67 +48,67 @@ export function useMe(): { me: Me | null; refresh: () => Promise<void> } {
   return { me, refresh };
 }
 
-// Mirrors the server's Purchase, minus fields the UI doesn't read.
-export interface Purchase {
+// Mirrors the server's Charge, minus fields the UI doesn't read.
+export interface Charge {
   id: string;
   signature: string;
   amountCents: number;
-  status: 'unconsumed' | 'consuming' | 'consumed' | 'failed';
-  purchasedAt: string;
+  status: 'held' | 'paying' | 'paid' | 'failed';
+  chargedAt: string;
   /**
    * Set when a payout was broadcast but did not confirm. `expired` means it
-   * never landed and never will, so opening again is safe and rebuilds it —
+   * never landed and never will, so trying again is safe and rebuilds it —
    * without this the UI cannot tell a payout in flight from a dead one.
    */
   payout?: { error?: string };
 }
 
-async function fetchPurchases(): Promise<Purchase[]> {
-  const response = await bankrollFetch('/api/purchases');
-  return response.ok ? ((await response.json()) as { purchases: Purchase[] }).purchases : [];
+async function fetchCharges(): Promise<Charge[]> {
+  const response = await bankrollFetch('/api/charges');
+  return response.ok ? ((await response.json()) as { charges: Charge[] }).charges : [];
 }
 
-export function usePurchases(): { purchases: Purchase[]; refresh: () => Promise<void> } {
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
+export function useCharges(): { charges: Charge[]; refresh: () => Promise<void> } {
+  const [charges, setCharges] = useState<Charge[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    void fetchPurchases().then((next) => {
-      if (!cancelled) setPurchases(next);
+    void fetchCharges().then((next) => {
+      if (!cancelled) setCharges(next);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const refresh = useCallback(async () => setPurchases(await fetchPurchases()), []);
-  return { purchases, refresh };
+  const refresh = useCallback(async () => setCharges(await fetchCharges()), []);
+  return { charges, refresh };
 }
 
 /**
- * Buy: charge the user, then hand the signature to the server, which confirms
- * it on-chain and records the purchase.
+ * Take money: ask the host to charge the user, then hand the signature to the
+ * server, which confirms it on-chain and records it.
  *
- * The idempotency key names this one purchase, so a retry after an interrupted
- * charge recovers the same payment rather than charging twice. It is generated
- * per call — never shared across purchases — so two buys are two payments while
- * a retry of one buy is not.
+ * The idempotency key names this one charge, so a retry after an interrupted
+ * payment recovers the same one rather than charging twice. It is generated per
+ * call — never shared — so two charges are two payments while a retry of one
+ * charge is not.
  */
-export async function buy(token?: string): Promise<{ ok: boolean; error?: string }> {
+export async function charge(token?: string): Promise<{ ok: boolean; error?: string }> {
   const idempotencyKey = crypto.randomUUID();
   try {
     // `token` names one of the app's own declared mints; omitted, the charge
     // settles in HSUSD. Either way the server checks which asset actually paid
-    // before it releases anything.
-    const signature = await bankroll.charge({ amountCents: PRICE_CENTS, idempotencyKey, token });
-    const response = await bankrollFetch('/api/purchases', {
+    // before it records anything.
+    const signature = await bankroll.charge({ amountCents: CHARGE_CENTS, idempotencyKey, token });
+    const response = await bankrollFetch('/api/charges', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ signature }),
     });
     if (!response.ok) {
       const body = (await response.json()) as { error?: string };
-      return { ok: false, error: body.error ?? 'purchase failed' };
+      return { ok: false, error: body.error ?? 'charge failed' };
     }
     return { ok: true };
   } catch (error) {
@@ -124,19 +124,19 @@ export async function buy(token?: string): Promise<{ ok: boolean; error?: string
   }
 }
 
-/** Open a loot box: consume the purchase and pay the reward to the wallet. */
-export async function open(id: string): Promise<{ ok: boolean; error?: string }> {
-  const response = await bankrollFetch(`/api/purchases/${encodeURIComponent(id)}/consume`, {
+/** Send money: pay a charge back out to the wallet that made it. */
+export async function payOut(id: string): Promise<{ ok: boolean; error?: string }> {
+  const response = await bankrollFetch(`/api/charges/${encodeURIComponent(id)}/payout`, {
     method: 'POST',
   });
   // 202 means the payout was broadcast but did not confirm in time. It may
   // still land, so this is not a failure — but it is not done either, and
-  // saying nothing leaves the box sitting on "paying…" with no explanation.
+  // saying nothing leaves the row sitting on "paying…" with no explanation.
   if (response.status === 202) return { ok: false, error: 'still settling — try again shortly' };
   if (response.ok) return { ok: true };
   const body = (await response.json()) as { error?: string };
-  return { ok: false, error: body.error ?? 'could not open' };
+  return { ok: false, error: body.error ?? 'could not pay out' };
 }
 
-// The loot box price, in cents — matches the server's PRICE_CENTS.
-const PRICE_CENTS = 100;
+// What the demo charges, in cents — matches the server's PRICE_CENTS.
+const CHARGE_CENTS = 100;

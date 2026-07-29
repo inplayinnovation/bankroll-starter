@@ -4,11 +4,11 @@ A real-money app, running on your phone, in three commands.
 
 ```bash
 npm create @joinbankroll/app@latest my-app
+cd my-app
+npm run dev
 ```
 
-It scaffolds, installs, and starts the app — the QR is waiting when it finishes.
-
-Scan the QR it prints. Your app opens inside Bankroll and starts taking payments and paying them back out, hot reload included.
+`npm run dev` prints a QR. Scan it: your app opens inside Bankroll and starts taking payments and paying them back out, hot reload included.
 
 No account. No signup. No API key. Nothing to register.
 
@@ -56,7 +56,7 @@ Everything that is not your app comes from [`@joinbankroll/sdk`](https://www.npm
 
 ## Make it yours
 
-It sells a $1 loot box that pays $1 back — a deliberately trivial product, so the money loop and the store are what's on show. Sell rounds of golf, contest entries, tips — whatever you're building. Open the project in Claude Code, Cursor, or Codex and ask:
+What ships is a demo, not a product: it shows you the session Bankroll signs — wallet, identity, location, age — then charges $1 and pays the same $1 back, so both directions of the money loop are visible. Delete it and sell rounds of golf, contest entries, tips, loot boxes — whatever you're building. Open the project in Claude Code, Cursor, or Codex and ask:
 
 > Set up this Bankroll app so it can take payments.
 

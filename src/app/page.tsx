@@ -15,8 +15,8 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   // playLink refuses anything that isn't https, which is exactly what Bankroll
   // cannot open — so on a localhost dev server there is nothing to render here.
-  // That is fine: `npm run bankroll` prints a QR for the tunnel, which is how
-  // you get it onto a phone.
+  // That is fine: `npm run dev` prints a QR for the tunnel, which is how you
+  // get it onto a phone.
   const origin = await getOrigin();
   const href = origin.startsWith('https://') ? playLink(`${origin}${APP_PATH}`) : null;
 
@@ -25,7 +25,7 @@ export default async function Home() {
       <div className="flex flex-col gap-3">
         <h1 className="text-4xl font-semibold tracking-tight">{appName()}</h1>
         <p className="max-w-xs text-neutral-400">
-          Buy a loot box, open it, get paid. Runs inside the Bankroll app.
+          Take a payment, pay it back out. Runs inside the Bankroll app.
         </p>
       </div>
 
