@@ -10,9 +10,9 @@ Platform docs: https://docs.joinbankroll.com/llms-full.txt
 ## Commands
 
 ```bash
-npm run dev            # localhost, no tunnel
-npm run bankroll       # what the CLI can do — every command is passed through
-npm run bankroll dev   # dev server + tunnel, prints a QR that opens it on a phone
+npm run dev            # bankroll dev — tunnel + QR that opens the app on a phone
+npx bankroll --help    # treasury, token, and anything else
+npx next dev           # plain localhost, no tunnel — the exception
 npm run build          # next build
 npm test               # vitest run
 npm run typecheck      # tsc --noEmit
@@ -32,7 +32,7 @@ real data.
 
 **Local development needs nothing.** `npm create @joinbankroll/app` writes
 `.env.local` — `STORE=fs`, the app name, and an RPC — and starts the app.
-`npm run bankroll dev` picks it back up: a tunnel, and a QR that opens the app
+`npm run dev` picks it back up: a tunnel, and a QR that opens the app
 on a phone.
 
 The key that receives payments and signs payouts lives at
