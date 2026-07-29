@@ -6,17 +6,18 @@
 // installing the app for someone who doesn't have it. Linking there beats
 // reimplementing any of it.
 import { playLink } from '@joinbankroll/sdk';
-import { publicOrigin } from '@joinbankroll/sdk/next';
+import { getOrigin } from '@joinbankroll/sdk/next';
 
 import { APP_PATH, appName } from '@/lib/app-identity';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  // In development this is the tunnel, so the link works from the laptop that
-  // rendered it. playLink refuses anything that isn't https — which is exactly
-  // the case Bankroll can't open, so there's nothing to render for it.
-  const origin = await publicOrigin();
+  // playLink refuses anything that isn't https, which is exactly what Bankroll
+  // cannot open — so on a localhost dev server there is nothing to render here.
+  // That is fine: `npm run bankroll` prints a QR for the tunnel, which is how
+  // you get it onto a phone.
+  const origin = await getOrigin();
   const href = origin.startsWith('https://') ? playLink(`${origin}${APP_PATH}`) : null;
 
   return (
