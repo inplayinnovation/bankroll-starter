@@ -43,7 +43,12 @@ It moves real mainnet HSUSD. `npm run bankroll` creates a signing key at `~/.con
 npm run bankroll   # dev server behind a public tunnel, and a QR to open it
 npm run dev        # just the dev server, no tunnel
 npm run token      # the tokens this app declares
+npm run treasury   # the wallet this app runs on, and what it holds
 ```
+
+`npm run bankroll` is `bankroll dev`, so it takes no subcommand of its own —
+reach anything else with `npx bankroll <command>`, or pass flags after `--`
+(`npm run token -- create --name "Promo Credit"`).
 
 `npm run token -- create --name "Promo Credit"` mints your own token: play money that spends in your app and nowhere else, so you can exercise the whole money loop without spending real money. It lands in [`app-tokens.json`](./app-tokens.json), which is the `appTokens` claim your manifest serves.
 

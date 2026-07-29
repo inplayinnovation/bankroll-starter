@@ -11,7 +11,8 @@
     "test": "vitest run",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "token": "bankroll token"
+    "token": "bankroll token",
+    "treasury": "bankroll treasury"
   },
   "dependencies": {
     "@joinbankroll/sdk": "^0.9.0",
