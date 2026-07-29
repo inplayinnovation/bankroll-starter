@@ -5,14 +5,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
-    "bankroll": "bankroll dev",
+    "bankroll": "bankroll",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "token": "bankroll token",
-    "treasury": "bankroll treasury"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@joinbankroll/sdk": "^0.9.0",

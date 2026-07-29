@@ -4,9 +4,9 @@ A real-money app, running on your phone, in three commands.
 
 ```bash
 npm create @joinbankroll/app@latest my-app
-cd my-app
-npm run bankroll
 ```
+
+It scaffolds, installs, and starts the app — the QR is waiting when it finishes.
 
 Scan the QR it prints. Your app opens inside Bankroll and starts taking payments and paying them back out, hot reload included.
 
@@ -40,17 +40,18 @@ It moves real mainnet HSUSD. `npm run bankroll` creates a signing key at `~/.con
 ## Commands
 
 ```bash
-npm run bankroll   # dev server behind a public tunnel, and a QR to open it
-npm run dev        # just the dev server, no tunnel
-npm run token      # the tokens this app declares
-npm run treasury   # the wallet this app runs on, and what it holds
+npm run bankroll              # what the CLI can do
+npm run bankroll dev          # dev server behind a public tunnel, and a QR
+npm run bankroll treasury     # the wallet this app runs on, and what it holds
+npm run bankroll token create --name "Promo Credit"
+
+npm run dev                   # just the dev server, no tunnel
 ```
 
-`npm run bankroll` is `bankroll dev`, so it takes no subcommand of its own —
-reach anything else with `npx bankroll <command>`, or pass flags after `--`
-(`npm run token -- create --name "Promo Credit"`).
+Everything after `npm run bankroll` is passed straight to the CLI, so there is
+one way in rather than a script per command. Run it bare to see the list.
 
-`npm run token -- create --name "Promo Credit"` mints your own token: play money that spends in your app and nowhere else, so you can exercise the whole money loop without spending real money. It lands in [`app-tokens.json`](./app-tokens.json), which is the `appTokens` claim your manifest serves.
+`npm run bankroll token create --name "Promo Credit"` mints your own token: play money that spends in your app and nowhere else, so you can exercise the whole money loop without spending real money. It lands in [`app-tokens.json`](./app-tokens.json), which is the `appTokens` claim your manifest serves.
 
 Everything that is not your app comes from [`@joinbankroll/sdk`](https://www.npmjs.com/package/@joinbankroll/sdk) and [`@joinbankroll/cli`](https://www.npmjs.com/package/@joinbankroll/cli), so it updates with `npm update` rather than a merge.
 

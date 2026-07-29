@@ -10,12 +10,13 @@ Platform docs: https://docs.joinbankroll.com/llms-full.txt
 ## Commands
 
 ```bash
-npm run dev        # localhost:3000
-npm run bankroll   # dev server + tunnel, prints a QR that opens the app on a phone
-npm run build      # next build
-npm test           # vitest run
-npm run typecheck  # tsc --noEmit
-npm run lint       # eslint
+npm run dev            # localhost, no tunnel
+npm run bankroll       # what the CLI can do — every command is passed through
+npm run bankroll dev   # dev server + tunnel, prints a QR that opens it on a phone
+npm run build          # next build
+npm test               # vitest run
+npm run typecheck      # tsc --noEmit
+npm run lint           # eslint
 ```
 
 Run `npm run typecheck && npm run lint` before finishing any change.
@@ -29,11 +30,15 @@ real data.
 
 ## Setup (local)
 
-**Local development needs nothing.** `npm run bankroll` writes `.env.local` on
-first run — a generated treasury, `STORE=fs`, and answers to two prompts (app
-name, RPC) — then serves the app through a tunnel and prints a QR to open it on
-a phone. It moves real mainnet HSUSD, so fund that treasury with only what you
-need to test.
+**Local development needs nothing.** `npm create @joinbankroll/app` writes
+`.env.local` — `STORE=fs`, the app name, and an RPC — and starts the app.
+`npm run bankroll dev` picks it back up: a tunnel, and a QR that opens the app
+on a phone.
+
+The key that receives payments and signs payouts lives at
+`~/.config/bankroll/keypair.json`, created on first use and injected into the
+dev server rather than written into the project, so it cannot be committed. It
+moves real mainnet HSUSD — fund it with only what you need to test.
 
 The tunnel gets a **new URL on every restart**, so the host can't reopen a
 previous one: scan the new QR after each start. "Can't open this app" almost
@@ -98,6 +103,11 @@ broadcast; a stuck `consuming` purchase resumes from those exact bytes when
 consume is called again (a byte-identical rebroadcast is one transfer, so it
 can't pay twice). On `PayError` the purchase stays `consuming` — never blind-
 retry an unknown outcome; only `expired` and `send_failed` prove no money moved.
+
+The exception is `expired`. That transaction's blockhash has passed, so it can
+never land however many times it is resent — and expiry is exactly what proves
+nothing moved, so consume rebuilds it instead. Without that a purchase sits in
+`consuming` forever and the user is charged with no refund.
 
 ## Storage
 
