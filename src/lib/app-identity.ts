@@ -8,6 +8,18 @@ export const appName = (): string => process.env.BANKROLL_APP_NAME || DEFAULT_NA
 
 export const appNameConfigured = (): boolean => Boolean(process.env.BANKROLL_APP_NAME);
 
+// Where your users get help. Bankroll offers it in this app's own menu, and
+// opening it hands the URL to the operating system — so a help page, a
+// `mailto:`, a `tel:`, or a chat invite all work. It may point anywhere; a
+// support desk usually lives on somebody else's domain. Unset means no menu
+// item, which is the right answer until you have somewhere to send people.
+//
+// Changing it later re-asks every existing user for consent, because a grant is
+// bound to the exact manifest it was made against. Point it at something
+// durable — a page you control that redirects — rather than a link you expect
+// to rotate.
+export const supportUrl = (): string | null => process.env.BANKROLL_SUPPORT_URL || null;
+
 // Where the app itself runs — the manifest's `launch` claim, and the target of
 // the landing page's "Open on Bankroll" link. The host boots a connected app at
 // this path; without the claim it would boot at the origin, which serves the

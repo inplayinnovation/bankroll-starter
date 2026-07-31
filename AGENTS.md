@@ -59,6 +59,12 @@ money-path rules below are what carries over.
 - `src/app/api/charges/` — the money. `route.ts` takes a charge and lists them;
   `[id]/payout` pays one back out.
 - `src/lib/store.ts` — this app's durable state; see Storage.
+- `src/lib/app-identity.ts` — how the app introduces itself in the manifest:
+  its name, where it boots, the tokens it issues, and `BANKROLL_SUPPORT_URL`,
+  which puts a "Help with <app>" item in Bankroll's own menu. Any URL works —
+  a help page, `mailto:`, `tel:`, a chat invite — and it opens outside the app.
+  Changing it later re-asks every existing user for consent, so point it at
+  something durable.
 
 Everything that is not this app comes from `@joinbankroll/sdk` and updates with
 `npm update` rather than being edited here: sessions, origin, and the manifest
