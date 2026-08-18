@@ -1,0 +1,43 @@
+# Runs on every push and pull request, and needs no secrets — a fork gets a
+# working pipeline the moment it is created.
+#
+# The first step is the one that matters most: `npm ci` installs strictly from
+# the lockfile and fails if it disagrees with package.json. That is exactly the
+# path someone takes when they fork this template, and it is invisible locally,
+# where `npm install` quietly rewrites the lock and an existing node_modules is
+# already correct.
+#
+# The Blob store tests skip themselves without DANGEROUS_BLOB_TOKEN (see
+# vitest.config.ts), so the filesystem backend is what runs here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
