@@ -57,7 +57,10 @@ money-path rules below are what carries over.
 - `src/app/demo.tsx` — the app's surface. Delete it and render your own from
   `/app`, which stays a thin shell. It is not a wallet: the host is.
 - `src/app/api/charges/` — the money. `route.ts` takes a charge and lists them;
-  `[id]/payout` pays one back out.
+  `intent/` starts one; `[id]/payout` pays one back out.
+- `src/lib/charges.ts` — the price, and the checks a settled payment must pass.
+  Both the live path and the sweep go through it, so they cannot drift apart.
+- `src/lib/sweep.ts` — finding charges that settled but were never reported.
 - `src/lib/store.ts` — this app's durable state; see Storage.
 - `src/lib/app-identity.ts` — how the app introduces itself in the manifest:
   its name, where it boots, the tokens it issues, and `BANKROLL_SUPPORT_URL`,
@@ -118,6 +121,60 @@ never land however many times it is resent — and expiry is exactly what proves
 nothing moved, so the route rebuilds it instead. Without that a charge sits in
 `paying` forever and the user is charged with no refund.
 
+**5. Write down what you are about to charge, before you charge it.** `charge()`
+gives the signature to the page, and the page gives it to you. If the page dies
+in between — app killed, connection dropped, battery flat — the payment still
+settled, and nothing you hold points to it. So the server mints a `reference`
+first and stores it with the attempt; the payment carries it on-chain, and the
+charge stays findable by an id that existed before it did.
+
+```ts
+const intent = await recordIntent(wallet, createReference(), crypto.randomUUID(), PRICE_CENTS);
+// the page passes intent.reference and intent.paymentKey to charge()
+const charge = await findChargeByReference(intent.reference);   // later, if it never reported
+```
+
+Mint both server-side. A reference the page invents is one the page can lose,
+reuse, or forget to send, and the same is true of the key that stops a retry
+charging twice.
+
+A found charge is a candidate, not a receipt. A reference is public once it
+lands, so anyone can attach it to a transfer of their own — run rule 2's checks
+on it exactly as you would on one the page reported, which is why both paths
+call the same `settle()`.
+
+Recovery costs nothing extra to make safe: the charge id still comes from the
+transaction, so a sweep that finds a payment computes the same id as the live
+path and rule 3's atomic create collapses them. No lock, no "being recovered"
+state.
+
+**Sweep on whether an attempt was answered, never on how old it is.** Age says
+when a payment can still *arrive* — a transaction cannot land once its blockhash
+has died. It says nothing about whether one already arrived while nobody was
+watching, which is the entire case this exists for. Someone who pays, loses the
+page, and comes back an hour later must still be recovered. Age decides only
+when a chain that has never heard of an attempt turns "not yet" into "never", at
+which point the attempt is closed as `unpaid` and never asked about again.
+
+Two limits worth knowing before you build on this:
+
+- **One intent per attempt, keyed under the wallet.** Keeping only a wallet's
+  latest attempt would erase an unresolved one the moment the user tried again —
+  losing the reference for a payment that had already settled. If you sell more
+  than one thing, key intents per *order* rather than per attempt and carry the
+  order id on the document.
+- **`findChargeByReference` returns one candidate**, the oldest transfer
+  carrying the reference that parses as a payment. A transaction carrying your
+  reference that lands *first* therefore hides the real charge. It takes someone
+  who knows the reference and is willing to spend real money, but there is no
+  way to recover from it in the app — treat a reference as something to keep out
+  of logs and URLs.
+
+**Refuse rather than charge without a reference.** Passing one needs a Bankroll
+app new enough to carry it, and the SDK rejects `update_required` on anything
+older. Ask for the update. Silently charging without a reference is exactly the
+payment you cannot find later.
+
 ## Storage
 
 `src/lib/store.ts` — this app's Charge model. The backends behind it are
@@ -136,6 +193,14 @@ One document per charge at `charges/<wallet>/<invertedSlot>-<signature>.json` �
 no aggregate to keep in sync, which is what makes it safe on a store with no
 transactions. Outgrow it → replace `store/` with Postgres; don't add query
 capability the object store can't back (filter with your own index).
+
+Alongside it, one per attempt at
+`intents/<wallet>/<invertedStartedAt>-<reference>.json` (rule 5). Not
+authoritative — the charge document is, and it is still keyed by the transaction
+— so an intent is only a note to go and look. Nested under the wallet on purpose:
+listing one level below a prefix behaves the same on both backends, while a
+listing across *all* wallets does not (Blob's is recursive, the filesystem's is
+one directory deep), so a global reconcile is deployment-only work.
 
 ## Deploy
 
