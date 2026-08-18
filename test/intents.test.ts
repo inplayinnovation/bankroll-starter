@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { HSUSD_MINT } from '@joinbankroll/sdk/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { listRecentIntents, recordIntent, recordCharge, resolveIntent } from '@/lib/store';
+import { closeIntent, listOpenIntents, recordIntent, recordCharge } from '@/lib/store';
 
 // An intent is the note that makes a payment findable when the page never got
 // to report it. What matters is that no attempt is ever lost, that the sweep's
@@ -21,8 +21,8 @@ describe('recordIntent', () => {
     const first = await recordIntent(w, reference(), randomUUID(), 100);
     const second = await recordIntent(w, reference(), randomUUID(), 100);
 
-    const recent = await listRecentIntents(w, MINUTE);
-    expect(recent.map((intent) => intent.id).sort()).toEqual([first.id, second.id].sort());
+    const open = await listOpenIntents(w);
+    expect(open.map((intent) => intent.id).sort()).toEqual([first.id, second.id].sort());
   });
 
   it('carries the reference and the key the charge will be made with', async () => {
@@ -33,38 +33,50 @@ describe('recordIntent', () => {
 
     expect(intent.reference).toBe(ref);
     expect(intent.paymentKey).toBe(key);
-    expect(intent.resolved).toBeUndefined();
+    expect(intent.outcome).toBeUndefined();
   });
 });
 
-describe('listRecentIntents', () => {
+describe('listOpenIntents', () => {
   it('returns attempts newest first', async () => {
     const w = wallet();
     const older = await recordIntent(w, reference(), randomUUID(), 100);
     await new Promise((resolve) => setTimeout(resolve, 2));
     const newer = await recordIntent(w, reference(), randomUUID(), 100);
 
-    const recent = await listRecentIntents(w, MINUTE);
-    expect(recent[0]!.id).toBe(newer.id);
-    expect(recent[1]!.id).toBe(older.id);
+    const open = await listOpenIntents(w);
+    expect(open[0]!.id).toBe(newer.id);
+    expect(open[1]!.id).toBe(older.id);
   });
 
-  // The walk stops at the first attempt too old to still be in flight, so it is
-  // bounded by how many charges were started recently — never by history. Past
-  // the window a payment has settled or died with its blockhash, so there is
-  // nothing left worth asking the chain about.
-  it('leaves behind attempts too old to still be in flight', async () => {
+  // The case the whole feature exists for. Someone pays, the page dies before
+  // it can report the signature, and they come back an hour later — age is what
+  // says a payment can no longer ARRIVE, and says nothing about whether one
+  // already did while nobody was watching. An attempt is only dropped once it
+  // has an answer.
+  it('still returns an attempt nobody answered an hour ago', async () => {
     const w = wallet();
     await recordIntent(w, reference(), randomUUID(), 100);
-    expect(await listRecentIntents(w, MINUTE)).toHaveLength(1);
 
     vi.useFakeTimers();
     try {
-      vi.setSystemTime(Date.now() + 5 * MINUTE);
-      expect(await listRecentIntents(w, MINUTE)).toHaveLength(0);
+      vi.setSystemTime(Date.now() + 60 * MINUTE);
+      expect(await listOpenIntents(w)).toHaveLength(1);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('drops an attempt once it has one', async () => {
+    const w = wallet();
+    const recorded = await recordIntent(w, reference(), randomUUID(), 100);
+    const unpaid = await recordIntent(w, reference(), randomUUID(), 100);
+    const open = await recordIntent(w, reference(), randomUUID(), 100);
+
+    await closeIntent(w, recorded.id, 'recorded');
+    await closeIntent(w, unpaid.id, 'unpaid');
+
+    expect((await listOpenIntents(w)).map((intent) => intent.id)).toEqual([open.id]);
   });
 
   it('scopes to one wallet', async () => {
@@ -73,24 +85,23 @@ describe('listRecentIntents', () => {
     await recordIntent(mine, reference(), randomUUID(), 100);
     await recordIntent(theirs, reference(), randomUUID(), 100);
 
-    expect(await listRecentIntents(mine, MINUTE)).toHaveLength(1);
+    expect(await listOpenIntents(mine)).toHaveLength(1);
   });
 });
 
-describe('resolveIntent', () => {
-  it('marks an attempt answered so the sweep stops asking', async () => {
+describe('closeIntent', () => {
+  it.each(['recorded', 'unpaid'] as const)('closes an attempt as %s', async (outcome) => {
     const w = wallet();
     const intent = await recordIntent(w, reference(), randomUUID(), 100);
 
-    await resolveIntent(w, intent.id);
+    await closeIntent(w, intent.id, outcome);
 
-    const [stored] = await listRecentIntents(w, MINUTE);
-    expect(stored!.resolved).toBe(true);
+    expect(await listOpenIntents(w)).toHaveLength(0);
   });
 
   // The charge is recorded either way; this only saves a later lookup.
   it('does not throw for an intent that is not there', async () => {
-    await expect(resolveIntent(wallet(), 'missing')).resolves.toBeUndefined();
+    await expect(closeIntent(wallet(), 'missing', 'recorded')).resolves.toBeUndefined();
   });
 });
 

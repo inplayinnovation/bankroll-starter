@@ -172,11 +172,15 @@ export interface Intent {
   amountCents: number;
   startedAt: string;
   /**
-   * Set once the charge behind it has been recorded. Only an optimisation: it
-   * saves re-asking the chain about a payment already settled, and an intent
-   * left open simply ages out of the window the sweep looks at.
+   * How this attempt ended. Absent means it is still open — the sweep will keep
+   * asking the chain about it, however old it gets, because age says when a
+   * payment could still *arrive*, not whether one already did while nobody was
+   * looking. Only a settled answer closes an intent:
+   *
+   *   `recorded`  the charge exists, by whichever path found it
+   *   `unpaid`    its window closed and the chain has nothing — it never can
    */
-  resolved?: boolean;
+  outcome?: 'recorded' | 'unpaid';
 }
 
 /** Start an attempt: the note the sweep will find if this page never reports back. */
@@ -199,37 +203,52 @@ export async function recordIntent(
 }
 
 /**
- * The attempts recent enough to still be in flight, newest first.
+ * The attempts still waiting on an answer, newest first.
  *
- * Bounded by time rather than by count: keys sort newest first, so the walk
- * stops at the first attempt older than the window and never touches the rest.
- * Anything past it has settled or expired — a charge cannot land once the
- * blockhash it was signed against has died — so there is nothing older worth
- * asking the chain about.
+ * Deliberately not bounded by age. An hour-old attempt nobody ever reported is
+ * exactly the one worth asking about — the payment may well have settled while
+ * the page that would have told us was gone. Only an outcome closes an intent,
+ * and every intent gets one, so this list is the small set of attempts that have
+ * not been answered yet rather than a growing history.
+ *
+ * The walk is bounded by pages instead: attempts are newest first and closed
+ * ones are the overwhelming majority, so anything still open is near the front.
+ * A stray open intent buried behind hundreds of closed ones is one the next page
+ * would find, and its window has long since closed either way.
  */
-export async function listRecentIntents(wallet: string, withinMs: number): Promise<Intent[]> {
-  const cutoff = Date.now() - withinMs;
-  const recent: Intent[] = [];
+const MAX_SWEEP_PAGES = 5;
+
+export async function listOpenIntents(wallet: string): Promise<Intent[]> {
+  const open: Intent[] = [];
   let cursor: string | undefined;
 
-  do {
-    const page = await backend.list<Intent>(intentPrefix(wallet), { cursor });
-    for (const intent of page.items) {
-      if (new Date(intent.startedAt).getTime() < cutoff) return recent;
-      recent.push(intent);
-    }
-    cursor = page.cursor;
-  } while (cursor);
+  for (let page = 0; page < MAX_SWEEP_PAGES; page += 1) {
+    const { items, cursor: next } = await backend.list<Intent>(intentPrefix(wallet), { cursor });
+    open.push(...items.filter((intent) => !intent.outcome));
+    if (!next) break;
+    cursor = next;
+  }
 
-  return recent;
+  return open;
 }
 
-/** Note that an intent's charge is recorded, so the sweep stops asking about it. */
-export async function resolveIntent(wallet: string, id: string): Promise<void> {
+/**
+ * Close an attempt, so the sweep stops asking the chain about it.
+ *
+ * `recorded` once its charge exists; `unpaid` once its window has closed and the
+ * chain still has nothing, which is the only point at which "not yet" becomes
+ * "never" — a payment cannot land after the blockhash it was signed against has
+ * died.
+ */
+export async function closeIntent(
+  wallet: string,
+  id: string,
+  outcome: NonNullable<Intent['outcome']>,
+): Promise<void> {
   try {
     await updateJson<Intent>(backend, intentPath(wallet, id), (current) => ({
       ...current,
-      resolved: true,
+      outcome,
     }));
   } catch (error) {
     // The charge is recorded either way; this only saves a later lookup, so a

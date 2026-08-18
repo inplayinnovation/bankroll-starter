@@ -11,7 +11,7 @@
 import { ConfirmChargeError, findChargeByReference } from '@joinbankroll/sdk/server';
 
 import { settle } from '@/lib/charges';
-import { listRecentIntents, resolveIntent } from '@/lib/store';
+import { closeIntent, listOpenIntents } from '@/lib/store';
 
 /**
  * How long the user gets to approve. Every Bankroll charge expires; this only
@@ -22,11 +22,17 @@ export const CHARGE_EXPIRES_SECONDS = 90;
 
 // How long after a charge could last have been approved it might still land: a
 // signed transaction dies with the blockhash it was built on, plus room for the
-// RPC's index to catch up. Past this an unfound payment was never made.
+// RPC's index to catch up.
 const SETTLEMENT_SLACK_MS = 3 * 60 * 1000;
 
-/** The window worth asking the chain about — everything older has settled or died. */
-export const LOOKBACK_MS = CHARGE_EXPIRES_SECONDS * 1000 + SETTLEMENT_SLACK_MS;
+/**
+ * When an attempt that the chain has never heard of stops being "not yet" and
+ * becomes "never". It bounds when to give UP on an attempt — never whether to
+ * look at one. Age says when a payment could still arrive; it says nothing
+ * about whether one already arrived while nobody was watching, which is the
+ * whole case this exists for.
+ */
+export const SETTLES_BY_MS = CHARGE_EXPIRES_SECONDS * 1000 + SETTLEMENT_SLACK_MS;
 
 /**
  * Record any charge that settled without being reported, and return how many.
@@ -43,25 +49,31 @@ export const LOOKBACK_MS = CHARGE_EXPIRES_SECONDS * 1000 + SETTLEMENT_SLACK_MS;
 export async function sweep(wallet: string): Promise<number> {
   let recovered = 0;
 
-  for (const intent of await listRecentIntents(wallet, LOOKBACK_MS)) {
-    if (intent.resolved) continue;
+  for (const intent of await listOpenIntents(wallet)) {
+    const settlesBy = new Date(intent.startedAt).getTime() + SETTLES_BY_MS;
     try {
       const charge = await findChargeByReference(intent.reference);
-      // Not there yet — and possibly never. Either way the intent ages out of
-      // the window on its own; nothing needs to mark it dead.
-      if (!charge) continue;
+
+      if (!charge) {
+        // Nothing on-chain. Before its window closes that means "not yet" and
+        // the attempt stays open; after it, no payment can still arrive, so the
+        // attempt is closed and never asked about again.
+        if (Date.now() > settlesBy) await closeIntent(wallet, intent.id, 'unpaid');
+        continue;
+      }
 
       const result = await settle(wallet, charge);
       if (result.ok) {
-        await resolveIntent(wallet, intent.id);
+        await closeIntent(wallet, intent.id, 'recorded');
         if (result.created) recovered += 1;
       }
     } catch (error) {
-      // A payment that failed on-chain or was never a payment is settled news:
-      // stop asking about it. Anything else — an unreachable RPC most likely —
-      // is a failure to look, which must never read as a failure to find.
+      // A payment that failed on-chain, or was never a payment, is settled
+      // news: stop asking. Anything else — an unreachable RPC most likely — is
+      // a failure to look, which must never read as a failure to find, so the
+      // attempt stays open for the next visit.
       if (error instanceof ConfirmChargeError && error.code !== 'rpc_error') {
-        await resolveIntent(wallet, intent.id);
+        await closeIntent(wallet, intent.id, 'unpaid');
         continue;
       }
       return recovered;

@@ -14,7 +14,7 @@ import { requireIdentity, requireSession, Unauthorized } from '@joinbankroll/sdk
 import { ConfirmChargeError, confirmCharge } from '@joinbankroll/sdk/server';
 
 import { settle } from '@/lib/charges';
-import { listCharges, resolveIntent } from '@/lib/store';
+import { closeIntent, listCharges } from '@/lib/store';
 import { sweep } from '@/lib/sweep';
 
 export { PRICE_CENTS } from '@/lib/charges';
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     // The attempt behind this charge is answered, so the sweep can stop asking
     // the chain about it. Only an optimisation — an intent left open ages out
     // of the sweep's window by itself.
-    if (intentId) await resolveIntent(session.user.wallet, intentId);
+    if (intentId) await closeIntent(session.user.wallet, intentId, 'recorded');
 
     // A repeat is not a failure. A retried request and a replayed one look
     // identical, and both are already satisfied by the charge that exists.
