@@ -1,8 +1,8 @@
 import type { NextConfig } from 'next';
 
-// `npm run bankroll` serves the dev server through a Cloudflare tunnel so the
-// app can be opened on a phone, which makes hot-reload requests cross-origin —
-// and Next blocks those by default.
+// `npm run dev` (`bankroll dev`) serves the dev server through a Cloudflare
+// tunnel so the app can be opened on a phone, which makes hot-reload requests
+// cross-origin — and Next blocks those by default.
 //
 // A wildcard, because there is no moment at which this file could know the exact
 // host: next.config is read when the dev server boots, and the tunnel is raised

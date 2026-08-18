@@ -1,0 +1,12 @@
+# Keeps the template's lockfile current: every scaffold installs from it, so a
+# stale lock here means every new app starts behind. One grouped PR a week; CI
+# (typecheck, lint, test, build) decides whether it merges.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      all-dependencies:
+        patterns: ["*"]
