@@ -40,6 +40,13 @@ const chargePath = (wallet: string, id: string) =>
   `charges/${encodeURIComponent(wallet)}/${encodeURIComponent(id)}.json`;
 const walletPrefix = (wallet: string) => `charges/${encodeURIComponent(wallet)}/`;
 
+// Intents are keyed the same way charges are — newest first — because the sweep
+// only ever wants the recent ones and stops as soon as it reaches an attempt too
+// old to still be in flight.
+const intentPath = (wallet: string, id: string) =>
+  `intents/${encodeURIComponent(wallet)}/${encodeURIComponent(id)}.json`;
+const intentPrefix = (wallet: string) => `intents/${encodeURIComponent(wallet)}/`;
+
 /**
  * A charge, and everything that has happened to it.
  *
@@ -139,6 +146,96 @@ export async function listCharges(
 ): Promise<ChargePage> {
   const { items, cursor } = await backend.list<Charge>(walletPrefix(wallet), options);
   return { charges: items, ...(cursor ? { cursor } : {}) };
+}
+
+/**
+ * A charge this app is about to ask for, written before it asks.
+ *
+ * `charge()` hands the signature to the page, and the page hands it here. If
+ * the page dies in between, the payment still settled — money at the treasury
+ * that nothing points to. So the reference is minted and stored *first*: it
+ * rides along on the payment, the chain indexes it, and the charge stays
+ * findable by an id that existed before it did.
+ *
+ * This is deliberately not the authoritative record. The charge document is,
+ * and it is still keyed by the transaction — so a sweep that finds the payment
+ * later computes the same id, hits the same atomic create, and cannot record it
+ * twice. An intent is only a note to look.
+ */
+export interface Intent {
+  /** `<invertedStartedAt>-<reference>` — how you address this intent. */
+  id: string;
+  /** The address the payment carries, and what the charge is found by. */
+  reference: string;
+  /** Names the payment, so a retry of this attempt cannot charge twice. */
+  paymentKey: string;
+  amountCents: number;
+  startedAt: string;
+  /**
+   * Set once the charge behind it has been recorded. Only an optimisation: it
+   * saves re-asking the chain about a payment already settled, and an intent
+   * left open simply ages out of the window the sweep looks at.
+   */
+  resolved?: boolean;
+}
+
+/** Start an attempt: the note the sweep will find if this page never reports back. */
+export async function recordIntent(
+  wallet: string,
+  reference: string,
+  paymentKey: string,
+  amountCents: number,
+): Promise<Intent> {
+  const startedAt = new Date();
+  const intent: Intent = {
+    id: sortableId(startedAt.getTime(), reference),
+    reference,
+    paymentKey,
+    amountCents,
+    startedAt: startedAt.toISOString(),
+  };
+  await backend.createIfAbsent(intentPath(wallet, intent.id), intent);
+  return intent;
+}
+
+/**
+ * The attempts recent enough to still be in flight, newest first.
+ *
+ * Bounded by time rather than by count: keys sort newest first, so the walk
+ * stops at the first attempt older than the window and never touches the rest.
+ * Anything past it has settled or expired — a charge cannot land once the
+ * blockhash it was signed against has died — so there is nothing older worth
+ * asking the chain about.
+ */
+export async function listRecentIntents(wallet: string, withinMs: number): Promise<Intent[]> {
+  const cutoff = Date.now() - withinMs;
+  const recent: Intent[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const page = await backend.list<Intent>(intentPrefix(wallet), { cursor });
+    for (const intent of page.items) {
+      if (new Date(intent.startedAt).getTime() < cutoff) return recent;
+      recent.push(intent);
+    }
+    cursor = page.cursor;
+  } while (cursor);
+
+  return recent;
+}
+
+/** Note that an intent's charge is recorded, so the sweep stops asking about it. */
+export async function resolveIntent(wallet: string, id: string): Promise<void> {
+  try {
+    await updateJson<Intent>(backend, intentPath(wallet, id), (current) => ({
+      ...current,
+      resolved: true,
+    }));
+  } catch (error) {
+    // The charge is recorded either way; this only saves a later lookup, so a
+    // missing or contended intent is not worth failing the request over.
+    if (!(error instanceof DocumentNotFound)) throw error;
+  }
 }
 
 export class ChargeNotFound extends Error {

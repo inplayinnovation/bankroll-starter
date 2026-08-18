@@ -85,26 +85,44 @@ export function useCharges(): { charges: Charge[]; refresh: () => Promise<void> 
   return { charges, refresh };
 }
 
+interface Intent {
+  id: string;
+  reference: string;
+  paymentKey: string;
+  amountCents: number;
+  expiresInSeconds: number;
+}
+
 /**
- * Take money: ask the host to charge the user, then hand the signature to the
- * server, which confirms it on-chain and records it.
+ * Take money: ask the server what this charge is, ask the host to charge the
+ * user, then hand the signature back to be confirmed on-chain and recorded.
  *
- * The idempotency key names this one charge, so a retry after an interrupted
- * payment recovers the same one rather than charging twice. It is generated per
- * call — never shared — so two charges are two payments while a retry of one
- * charge is not.
+ * The server goes first for a reason. It writes down a reference before any
+ * money moves, and the payment carries it on-chain — so if this page dies
+ * before it can report the signature, the charge is still findable and the
+ * next visit recovers it. It also mints the key that names this attempt, so a
+ * retry of it cannot charge a second time.
  */
 export async function charge(token?: string): Promise<{ ok: boolean; error?: string }> {
-  const idempotencyKey = crypto.randomUUID();
+  const intentResponse = await bankrollFetch('/api/charges/intent', { method: 'POST' });
+  if (!intentResponse.ok) return { ok: false, error: 'could not start the charge' };
+  const intent = (await intentResponse.json()) as Intent;
+
   try {
     // `token` names one of the app's own declared mints; omitted, the charge
     // settles in HSUSD. Either way the server checks which asset actually paid
     // before it records anything.
-    const signature = await bankroll.charge({ amountCents: CHARGE_CENTS, idempotencyKey, token });
+    const signature = await bankroll.charge({
+      amountCents: intent.amountCents,
+      expiresInSeconds: intent.expiresInSeconds,
+      idempotencyKey: intent.paymentKey,
+      reference: intent.reference,
+      token,
+    });
     const response = await bankrollFetch('/api/charges', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ signature }),
+      body: JSON.stringify({ signature, intentId: intent.id }),
     });
     if (!response.ok) {
       const body = (await response.json()) as { error?: string };
@@ -114,9 +132,21 @@ export async function charge(token?: string): Promise<{ ok: boolean; error?: str
   } catch (error) {
     if (error instanceof BankrollError) {
       // The user declining or lacking funds is their own decision — Bankroll
-      // already told them, so there is nothing for the app to surface.
-      if (error.code === 'insufficient_funds' || error.code === 'payment_denied') {
+      // already told them, so there is nothing for the app to surface. A charge
+      // that ran out of time is the same: they saw it expire.
+      if (
+        error.code === 'insufficient_funds' ||
+        error.code === 'payment_denied' ||
+        error.code === 'charge_expired'
+      ) {
         return { ok: false };
+      }
+      // A reference needs a Bankroll app new enough to carry one, and this app
+      // will not charge without one — a payment it cannot find later is the
+      // thing all of this exists to prevent. Ask for the update rather than
+      // quietly taking money it might lose.
+      if (error.code === 'update_required') {
+        return { ok: false, error: 'Update the Bankroll app to pay here' };
       }
       return { ok: false, error: error.code };
     }
@@ -137,6 +167,3 @@ export async function payOut(id: string): Promise<{ ok: boolean; error?: string 
   const body = (await response.json()) as { error?: string };
   return { ok: false, error: body.error ?? 'could not pay out' };
 }
-
-// What the demo charges, in cents — matches the server's PRICE_CENTS.
-const CHARGE_CENTS = 100;
