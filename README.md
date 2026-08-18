@@ -56,7 +56,7 @@ Everything that is not your app comes from [`@joinbankroll/sdk`](https://www.npm
 
 ## Make it yours
 
-What ships is a demo, not a product: it shows you the session Bankroll signs — wallet, identity, location, age — then charges $1 and pays the same $1 back, so both directions of the money loop are visible. Delete it and sell rounds of golf, contest entries, tips, loot boxes — whatever you're building. Open the project in Claude Code, Cursor, or Codex and ask:
+What ships is a demo, not a product: it shows you the session Bankroll signs — wallet, identity, location, age — then charges a cent and pays the same cent back, so both directions of the money loop are visible. Delete it and sell rounds of golf, contest entries, tips, loot boxes — whatever you're building. Open the project in Claude Code, Cursor, or Codex and ask:
 
 > Set up this Bankroll app so it can take payments.
 

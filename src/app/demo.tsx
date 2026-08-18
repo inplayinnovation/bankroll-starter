@@ -23,7 +23,7 @@ import {
   type Me,
 } from '@/lib/client/bankroll';
 
-const CHARGE_LABEL = '$1.00';
+const CHARGE_LABEL = '$0.01';
 
 export function Demo({ ready, devTools }: { ready: boolean; devTools?: React.ReactNode }) {
   const status = useBankrollStatus();

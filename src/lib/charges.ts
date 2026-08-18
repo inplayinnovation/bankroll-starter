@@ -14,8 +14,12 @@ import { HSUSD_MINT, requireTreasury, type ConfirmedCharge } from '@joinbankroll
 import { appTokenMints } from '@/lib/app-identity';
 import { recordCharge, type Charge } from '@/lib/store';
 
-/** The amount this app charges. One price, because the demo is the money loop. */
-export const PRICE_CENTS = 100;
+/**
+ * The amount this app charges. One price, because the demo is the money loop
+ * rather than a catalogue — and the smallest real one, because every charge
+ * here moves actual money. A cent is enough to watch it move.
+ */
+export const PRICE_CENTS = 1;
 
 /** Why a settled payment was refused — none of these are retryable. */
 export type RejectedReason =

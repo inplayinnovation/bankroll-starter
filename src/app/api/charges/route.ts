@@ -2,9 +2,10 @@
 //
 // This is the receiving half of the money loop: the client calls
 // `bankroll.charge()`, the host settles it on-chain, and the signature arrives
-// here to be verified and recorded. The starter charges a flat $1 and pays the
-// same $1 back so both directions are visible; a real app charges for something
-// and keeps the money. The shape of this route is the part worth keeping.
+// here to be verified and recorded. The starter charges a cent and pays the
+// same cent back so both directions are visible; a real app charges for
+// something and keeps the money. The shape of this route is the part worth
+// keeping.
 //
 // What the checks are and why lives in lib/charges.ts, because the sweep needs
 // exactly the same ones — a payment found on-chain is no more trustworthy than

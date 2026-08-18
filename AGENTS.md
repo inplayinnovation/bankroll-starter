@@ -50,7 +50,7 @@ link. `/app` is the app itself, what the host loads. Keep the split: a real app
 has a site and an app, and the manifest is served from the origin either way.
 
 What ships is a demo rather than a product: it displays the session claims, then
-charges $1 and pays the same $1 back so both directions of the money loop are
+charges a cent and pays the same cent back so both directions of the money loop are
 visible. Replacing it with the thing you're actually selling is expected — the
 money-path rules below are what carries over.
 
