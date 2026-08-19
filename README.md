@@ -12,6 +12,10 @@ npm run dev
 
 No account. No signup. No API key. Nothing to register.
 
+Building with a coding agent? Start at
+[Build with an agent](https://docs.joinbankroll.com/build/agents) — it walks
+the whole setup, from an empty folder to the QR on your phone.
+
 ## The hard parts are already done
 
 **Payments.** Stablecoin transfers that settle on-chain and are final. No processor, no merchant account, no chargebacks, no payout rail to build.
