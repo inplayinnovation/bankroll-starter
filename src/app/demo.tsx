@@ -239,8 +239,9 @@ function ChargeRow({
           Pay out
         </button>
       )}
-      {/* A payout that expired never landed and never will, so this is safe to
-          try again — and has to be, or the row sits on "paying…" forever. */}
+      {/* Any recorded payout error is safe to retry: the route resolves the
+          stored signature first, so a retry can only confirm, prove the
+          attempt dead and rebuild, or keep waiting — never pay twice. */}
       {charge.status === 'paying' &&
         (charge.payout?.error ? (
           <button className="btn" disabled={busy} onClick={onPayOut}>

@@ -109,17 +109,16 @@ const { created, charge } = await recordCharge(wallet, signature, slot, amountCe
 ```
 
 **4. The payout runs on the charge's own document.** The whole payout lifecycle
-is compare-and-swap on one key, so nothing spans two documents. The
-`held → paying` transition records the built transaction *before* broadcast; a
-stuck `paying` charge resumes from those exact bytes when the payout is called
-again (a byte-identical rebroadcast is one transfer, so it can't pay twice). On
-`PayError` the charge stays `paying` — never blind-retry an unknown outcome;
-only `expired` and `send_failed` prove no money moved.
-
-The exception is `expired`. That transaction's blockhash has passed, so it can
-never land however many times it is resent — and expiry is exactly what proves
-nothing moved, so the route rebuilds it instead. Without that a charge sits in
-`paying` forever and the user is charged with no refund.
+is compare-and-swap on one key, so nothing spans two documents. The order is
+build → sign → **store** → send → confirm: the `held → paying` transition
+records the transaction's *signature* and expiry (signing is deterministic, so
+the id exists before anything is broadcast), and only then is it sent. A stuck
+`paying` charge is resolved by `confirmPayout(stored signature)` — never by
+resending, whose rejection can't say whether an earlier submission landed.
+`expired` is ledger-searched proof the attempt never landed and never can; it
+is the only outcome that licenses building a fresh transaction, so a second
+payout for the same charge cannot exist while the first might still be live.
+On any other `PayError` the charge stays `paying` — ask again later.
 
 **5. Write down what you are about to charge, before you charge it.** `charge()`
 gives the signature to the page, and the page gives it to you. If the page dies

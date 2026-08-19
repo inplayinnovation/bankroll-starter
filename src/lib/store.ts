@@ -54,9 +54,10 @@ const intentPrefix = (wallet: string) => `intents/${encodeURIComponent(wallet)}/
  *                 ↘ failed
  *
  * `paying` exists because paying a user out is not instantaneous and can fail
- * in ways that need resolving later. The transaction and its expiry are
- * recorded in this document *before* it is broadcast, so a charge whose payout
- * outcome was never learned is visible as `paying` rather than lost.
+ * in ways that need resolving later. The transaction's signature and expiry
+ * are recorded in this document *before* it is broadcast, so a charge whose
+ * payout outcome was never learned is visible as `paying` — and always
+ * resolvable, by asking the chain about that signature.
  */
 export type ChargeStatus = 'held' | 'paying' | 'paid' | 'failed';
 
@@ -77,11 +78,17 @@ export interface Charge {
   paidAt?: string;
   /** Whatever the app needs to remember about what this charge was for. */
   meta?: Record<string, unknown>;
-  /** Set once the payout begins; the transfer owed for this charge. */
+  /**
+   * Set once a payout is signed; the transfer owed for this charge. Signing
+   * is deterministic, so the signature — the transaction's on-chain id — is
+   * durable here BEFORE anything is broadcast.
+   */
   payout?: {
-    transaction: string;
-    lastValidBlockHeight?: number;
-    signature?: string;
+    /** The attempt's on-chain id, recorded before the send. */
+    signature: string;
+    /** The block height past which this attempt provably can never land. */
+    lastValidBlockHeight: number;
+    /** Last unresolved PayError code; `expired` licenses a rebuild. */
     error?: string;
   };
 }

@@ -3,12 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { HSUSD_MINT } from '@joinbankroll/sdk/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// The route's whole job is deciding which transaction to broadcast, so the
-// chain is mocked and the store is real — what matters is which bytes come out,
-// not that Solana works.
+// The route's whole job is deciding which transaction may exist and when it is
+// sent, so the chain is mocked and the store is real — what matters is which
+// bytes go out and what the document says at each step, not that Solana works.
 const sdk = vi.hoisted(() => ({
   built: 0,
   sent: [] as string[],
+  sendFails: null as string | null,
   confirmFails: null as string | null,
 }));
 
@@ -23,13 +24,19 @@ vi.mock('@joinbankroll/sdk/server', async (original) => {
   return {
     ...actual,
     requireTreasury: () => ({ address: 'Trea5ury', sendTransaction: async () => 'sig' }),
-    buildPayout: async () => {
+    buildAndSignPayout: async () => {
       sdk.built += 1;
-      return { transaction: `tx-${sdk.built}`, lastValidBlockHeight: 1000 + sdk.built };
+      return {
+        transaction: `tx-${sdk.built}`,
+        signature: `sig-${sdk.built}`,
+        lastValidBlockHeight: 1000 + sdk.built,
+        blockhash: `hash-${sdk.built}`,
+      };
     },
     sendPayout: async (transaction: string) => {
+      if (sdk.sendFails) throw new actual.PayError(sdk.sendFails as never, 'nope');
       sdk.sent.push(transaction);
-      return { signature: `sig-${sdk.sent.length}` };
+      return { signature: 'broadcast-echo' };
     },
     confirmPayout: async () => {
       if (sdk.confirmFails) throw new actual.PayError(sdk.confirmFails as never, 'nope');
@@ -55,6 +62,7 @@ async function charge() {
 beforeEach(() => {
   sdk.built = 0;
   sdk.sent = [];
+  sdk.sendFails = null;
   sdk.confirmFails = null;
 });
 
@@ -65,11 +73,28 @@ describe('paying a charge back out', () => {
 
     expect(response.status).toBe(200);
     expect(sdk.built).toBe(1);
+    expect(sdk.sent).toEqual(['tx-1']);
     expect((await getCharge(WALLET, id))?.status).toBe('paid');
   });
 
-  // A payout that did not confirm may still land, so the bytes are kept and the
-  // charge stays open rather than being paid a second time.
+  // THE invariant: the signature is durable before the broadcast, so a send
+  // that dies leaves an outcome the chain can be asked about — never money
+  // moving under an id the document doesn't know.
+  it('stores the signature before broadcasting', async () => {
+    const id = await charge();
+    sdk.sendFails = 'send_failed';
+
+    const response = await payOut(id);
+    expect(response.status).toBe(202);
+    expect(sdk.sent).toEqual([]);
+
+    const stored = await getCharge(WALLET, id);
+    expect(stored?.status).toBe('paying');
+    expect(stored?.payout?.signature).toBe('sig-1');
+  });
+
+  // A payout that did not confirm may still land, so the charge stays open
+  // rather than being paid a second time.
   it('records an unconfirmed payout without marking it paid', async () => {
     const id = await charge();
     sdk.confirmFails = 'expired';
@@ -82,10 +107,9 @@ describe('paying a charge back out', () => {
     expect(stored?.payout?.error).toBe('expired');
   });
 
-  // The bug this exists for: an expired transaction can never land, so
-  // re-broadcasting the recorded bytes left the charge `paying` forever and the
-  // app showing "paying…" with no way out.
-  it('rebuilds an expired payout instead of resending it', async () => {
+  // `expired` is ledger-searched proof the attempt never landed and never
+  // can — the one outcome that licenses a fresh transaction.
+  it('rebuilds an expired payout', async () => {
     const id = await charge();
     sdk.confirmFails = 'expired';
     await payOut(id);
@@ -95,24 +119,27 @@ describe('paying a charge back out', () => {
     const retry = await payOut(id);
 
     expect(retry.status).toBe(200);
-    // A second build, and the new bytes went out — not the dead ones.
+    // A second build went out — under a second recorded signature.
     expect(sdk.built).toBe(2);
     expect(sdk.sent).toEqual(['tx-1', 'tx-2']);
     expect((await getCharge(WALLET, id))?.status).toBe('paid');
+    expect((await getCharge(WALLET, id))?.payout?.signature).toBe('sig-2');
   });
 
-  // Anything other than expiry leaves the outcome unknown, and rebuilding then
-  // could pay twice — so those bytes are resent exactly.
-  it('resends the same bytes when the outcome is unknown', async () => {
+  // Anything short of `expired` leaves the outcome unknown. The retry
+  // resolves the STORED signature — it never sends again and never rebuilds.
+  it('resolves an unknown outcome by the stored signature, not a resend', async () => {
     const id = await charge();
     sdk.confirmFails = 'rpc_error';
     await payOut(id);
 
     sdk.confirmFails = null;
-    await payOut(id);
+    const retry = await payOut(id);
 
+    expect(retry.status).toBe(200);
     expect(sdk.built).toBe(1);
-    expect(sdk.sent).toEqual(['tx-1', 'tx-1']);
+    expect(sdk.sent).toEqual(['tx-1']);
+    expect((await getCharge(WALLET, id))?.status).toBe('paid');
   });
 
   it('is idempotent once paid', async () => {
