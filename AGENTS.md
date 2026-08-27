@@ -43,6 +43,15 @@ The tunnel gets a **new URL on every restart**, so the host can't reopen a
 previous one: scan the new QR after each start. "Can't open this app" almost
 always means a dead tunnel.
 
+If you are an agent: run `npm run dev` as a background task — its output, the
+QR included, is never shown to the user. Put the QR **in your chat reply** as
+plain monospace glyphs in a fenced code block, the play link under it;
+`bankroll dev` prints exactly that when stdout is not a TTY (CLI 0.3+, and
+https://docs.joinbankroll.com/build/agents.md carries the rebuild recipe for
+older CLIs). Never relay the ANSI QR from a TTY run — its contrast is in the
+color codes, so chat strips it to a wall of `▀` — and never send the QR as an
+image file or attachment; neither renders in a terminal chat.
+
 ## Structure
 
 `/` is the landing page — the public site whose job is the "Open on Bankroll"
