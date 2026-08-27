@@ -29,8 +29,7 @@ export type RejectedReason =
   | 'payment came from another wallet';
 
 export type SettleResult =
-  | { ok: true; created: boolean; charge: Charge }
-  | { ok: false; reason: RejectedReason };
+  { ok: true; created: boolean; charge: Charge } | { ok: false; reason: RejectedReason };
 
 /**
  * Check a settled payment against what this app expected, and record it.
@@ -51,11 +50,13 @@ export async function settle(wallet: string, charge: ConfirmedCharge): Promise<S
   const treasury = requireTreasury();
   const accepted = appTokenMints();
 
-  if (charge.payee !== treasury.address) return { ok: false, reason: 'payment went to another address' };
+  if (charge.payee !== treasury.address)
+    return { ok: false, reason: 'payment went to another address' };
   if (charge.mint !== HSUSD_MINT && !accepted.includes(charge.mint)) {
     return { ok: false, reason: 'payment was made in another asset' };
   }
-  if (charge.amountCents !== PRICE_CENTS) return { ok: false, reason: 'payment amount does not match' };
+  if (charge.amountCents !== PRICE_CENTS)
+    return { ok: false, reason: 'payment amount does not match' };
   if (charge.payer !== wallet) return { ok: false, reason: 'payment came from another wallet' };
 
   const { created, charge: recorded } = await recordCharge(

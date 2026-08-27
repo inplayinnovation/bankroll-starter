@@ -9,7 +9,12 @@ import { bankroll, BankrollError } from '@joinbankroll/sdk';
 import { bankrollFetch } from '@joinbankroll/sdk/react';
 import { useCallback, useEffect, useState } from 'react';
 
-export { bankrollFetch, useBankrollChecked, useBankrollStatus, verifyIdentity } from '@joinbankroll/sdk/react';
+export {
+  bankrollFetch,
+  useBankrollChecked,
+  useBankrollStatus,
+  verifyIdentity,
+} from '@joinbankroll/sdk/react';
 
 export interface Me {
   username: string;

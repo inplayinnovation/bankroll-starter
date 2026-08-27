@@ -35,8 +35,8 @@ export default async function Home() {
         </a>
       ) : (
         <p className="max-w-xs text-sm text-neutral-500">
-          Run <code className="text-neutral-300">npm run dev</code> to get a link that opens this
-          on a phone.
+          Run <code className="text-neutral-300">npm run dev</code> to get a link that opens this on
+          a phone.
         </p>
       )}
     </main>

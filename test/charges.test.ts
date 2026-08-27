@@ -60,7 +60,8 @@ describe('listCharges', () => {
   it('returns newest first, by slot', async () => {
     const w = wallet();
     // Record out of slot order on purpose.
-    for (const slot of [30, 10, 50, 20, 40]) await recordCharge(w, signature(), slot, 100, HSUSD_MINT);
+    for (const slot of [30, 10, 50, 20, 40])
+      await recordCharge(w, signature(), slot, 100, HSUSD_MINT);
     const { charges } = await listCharges(w);
     expect(charges.map((c) => c.id.split('-')[0])).toEqual(
       [...charges.map((c) => c.id.split('-')[0])].sort(),

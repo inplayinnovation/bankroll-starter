@@ -111,7 +111,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const payout = charge.payout;
-    if (payout === undefined) throw new Error(`charge ${id} is ${charge.status} with no recorded payout`);
+    if (payout === undefined)
+      throw new Error(`charge ${id} is ${charge.status} with no recorded payout`);
 
     // Resolve by the stored signature. A timeout is not a failure — the
     // payout may still land, so the charge stays `paying` and another call
