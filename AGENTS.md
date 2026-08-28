@@ -58,6 +58,23 @@ image file or attachment; neither renders in a terminal chat.
 link. `/app` is the app itself, what the host loads. Keep the split: a real app
 has a site and an app, and the manifest is served from the origin either way.
 
+Three conventions that split implies:
+
+- **The site is desktop, the app is a phone.** Give each its own layout shell
+  (the site frames itself full-width; `/app` gets the narrow safe-area shell)
+  and keep the root layout bare, so neither inherits the other's frame — and
+  don't share CSS class names between them.
+- **The app never links back to the site.** The site exists to hand a visitor
+  into Bankroll; a logo inside the app is a label, not a link, because tapping
+  it would drop a player out of their session for a page that only sends them
+  back.
+- **Put in-app navigation in the URL.** Anything a player perceives as a place
+  — a tab, a history screen — belongs in the query string, so links can be
+  shared and the back button works: sync tabs with `replaceState` (switching
+  tabs shouldn't pile up back entries), open overlay screens with `pushState`
+  so back closes them, and let deep links (an invite) win over the default
+  view on load.
+
 What ships is a demo rather than a product: it displays the session claims, then
 charges a cent and pays the same cent back so both directions of the money loop are
 visible. Replacing it with the thing you're actually selling is expected — the
