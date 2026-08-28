@@ -249,15 +249,33 @@ Development rejects sensitive values. Users open the app at
 
 ### The production treasury key
 
-Generate a **fresh** key for production — never the dev key, which sits in
-plaintext on the machine — and set it so it is never printed or written to disk:
-generate it and pipe straight into a sensitive variable.
+Reusing the dev key — `~/.config/bankroll/keypair.json` — is fine to get
+production started: dev and production become one treasury wallet, funded
+once. It is not a long-term setup. For real production use, either generate a
+fresh keypair and custody a copy of the secret securely (a sensitive variable
+cannot be read back, so that copy is the only recovery), or hold the treasury
+key in a service built for it, like Privy or Turnkey. Either command below
+writes the secret to stdout (piped, never shown) and the public address to
+stderr (shown, so you know which wallet to fund).
 
 ```bash
-# writes the secret to stdout (piped, never shown) and the public address to
-# stderr (shown, so you know which wallet to fund)
+# get started: reuse the dev treasury
+node -e "const bs58=require('bs58').default,{readFileSync}=require('fs'),{homedir}=require('os');const k=Uint8Array.from(JSON.parse(readFileSync(homedir()+'/.config/bankroll/keypair.json','utf8')));console.error('treasury:',bs58.encode(k.subarray(32)));process.stdout.write(bs58.encode(k))" \
+  | npx vercel env add BANKROLL_TREASURY_KEY production --sensitive
+
+# or generate a fresh production key
 node -e "const{generateKeyPairSync}=require('crypto'),bs58=require('bs58').default;const{publicKey,privateKey}=generateKeyPairSync('ed25519');const a=publicKey.export({format:'der',type:'spki'}).subarray(-32),s=privateKey.export({format:'der',type:'pkcs8'}).subarray(-32);console.error('treasury:',bs58.encode(a));process.stdout.write(bs58.encode(Buffer.concat([s,a])))" \
   | npx vercel env add BANKROLL_TREASURY_KEY production --sensitive
+```
+
+### The RPC
+
+`SOLANA_RPC_URL` can start unset — the SDK falls back to the public Solana
+endpoint, which is rate-limited and shared. Before real traffic, set it to a
+dedicated RPC (e.g. one from https://www.helius.dev):
+
+```bash
+npx vercel env add SOLANA_RPC_URL production
 ```
 
 ## STOP: never replace a funded treasury
