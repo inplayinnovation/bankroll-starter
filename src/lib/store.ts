@@ -177,6 +177,8 @@ export interface Intent {
   /** Names the payment, so a retry of this attempt cannot charge twice. */
   paymentKey: string;
   amountCents: number;
+  /** What was being bought — a key into lib/catalog.ts. Absent for the demo. */
+  item?: string;
   startedAt: string;
   /**
    * How this attempt ended. Absent means it is still open — the sweep will keep
@@ -196,6 +198,7 @@ export async function recordIntent(
   reference: string,
   paymentKey: string,
   amountCents: number,
+  item?: string,
 ): Promise<Intent> {
   const startedAt = new Date();
   const intent: Intent = {
@@ -203,10 +206,17 @@ export async function recordIntent(
     reference,
     paymentKey,
     amountCents,
+    ...(item ? { item } : {}),
     startedAt: startedAt.toISOString(),
   };
   await backend.createIfAbsent(intentPath(wallet, intent.id), intent);
   return intent;
+}
+
+/** The attempt behind a reported charge: what was asked for, at what price. */
+export async function getIntent(wallet: string, id: string): Promise<Intent | null> {
+  const stored = await backend.readJson<Intent>(intentPath(wallet, id));
+  return stored?.value ?? null;
 }
 
 /**

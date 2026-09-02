@@ -23,6 +23,7 @@ vi.mock('@joinbankroll/sdk/server', async (original) => {
   const actual = await original<typeof import('@joinbankroll/sdk/server')>();
   return {
     ...actual,
+    treasuryAddress: () => 'Trea5ury',
     requireTreasury: () => ({ address: 'Trea5ury', sendTransaction: async () => 'sig' }),
     buildAndSignPayout: async () => {
       sdk.built += 1;

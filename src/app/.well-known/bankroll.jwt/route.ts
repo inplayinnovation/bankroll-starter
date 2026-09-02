@@ -11,9 +11,8 @@
 // /.well-known/bankroll-icon.png (drop it in public/.well-known/). Until you
 // do, Bankroll shows a monogram of your app's name.
 import { manifestRoute } from '@joinbankroll/sdk/next';
-import { treasuryAddress } from '@joinbankroll/sdk/server';
 
-import { APP_PATH, appName, appTokens, supportUrl } from '@/lib/app-identity';
+import { APP_PATH, appName, appTokens, payeeAddress, supportUrl } from '@/lib/app-identity';
 
 // Required: the manifest is built from the request's own host, so it must not
 // be prerendered. The SDK cannot declare this for you — Next only reads it from
@@ -23,7 +22,7 @@ export const dynamic = 'force-dynamic';
 export const GET = manifestRoute({
   launch: APP_PATH,
   name: appName,
-  payments: treasuryAddress,
+  payments: payeeAddress,
   appTokens,
   supportUrl,
 });

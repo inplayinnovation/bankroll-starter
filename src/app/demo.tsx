@@ -117,7 +117,7 @@ export function Demo({ ready, devTools }: { ready: boolean; devTools?: React.Rea
                 className="btn"
                 disabled={busy}
                 key={token.mint}
-                onClick={() => run(() => charge(token.mint))}
+                onClick={() => run(() => charge({ token: token.mint }))}
               >
                 Charge 1 {token.name}
               </button>
@@ -128,7 +128,11 @@ export function Demo({ ready, devTools }: { ready: boolean; devTools?: React.Rea
 
       <Section
         title="Charges"
-        caption="Paying out returns the same amount, in whatever asset paid — so the loop runs as often as you like."
+        caption={
+          me.payoutsAvailable
+            ? 'Paying out returns the same amount, in whatever asset paid — so the loop runs as often as you like.'
+            : 'Charge-only mode: this app has a payee address but no treasury key, so it can take money and not send it.'
+        }
       >
         {charges.length === 0 ? (
           <p className="text-sm text-neutral-500">Nothing charged yet.</p>
@@ -139,6 +143,7 @@ export function Demo({ ready, devTools }: { ready: boolean; devTools?: React.Rea
                 key={item.id}
                 charge={item}
                 busy={busy}
+                payouts={me.payoutsAvailable}
                 onPayOut={() => run(() => payOut(item.id))}
               />
             ))}
@@ -223,10 +228,12 @@ function Copyable({ value }: { value: string }) {
 function ChargeRow({
   charge,
   busy,
+  payouts,
   onPayOut,
 }: {
   charge: Charge;
   busy: boolean;
+  payouts: boolean;
   onPayOut: () => void;
 }) {
   return (
@@ -234,11 +241,14 @@ function ChargeRow({
       <span className="font-mono text-xs text-neutral-500">
         {charge.signature.slice(0, 4)}…{charge.signature.slice(-4)}
       </span>
-      {charge.status === 'held' && (
-        <button className="btn" disabled={busy} onClick={onPayOut}>
-          Pay out
-        </button>
-      )}
+      {charge.status === 'held' &&
+        (payouts ? (
+          <button className="btn" disabled={busy} onClick={onPayOut}>
+            Pay out
+          </button>
+        ) : (
+          <Tag>received</Tag>
+        ))}
       {/* Any recorded payout error is safe to retry: the route resolves the
           stored signature first, so a retry can only confirm, prove the
           attempt dead and rebuild, or keep waiting — never pay twice. */}

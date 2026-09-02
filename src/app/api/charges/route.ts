@@ -14,7 +14,7 @@ import { requireIdentity, requireSession, Unauthorized } from '@joinbankroll/sdk
 import { ConfirmChargeError, confirmCharge } from '@joinbankroll/sdk/server';
 
 import { settle } from '@/lib/charges';
-import { closeIntent, listCharges } from '@/lib/store';
+import { closeIntent, getIntent, listCharges } from '@/lib/store';
 import { sweep } from '@/lib/sweep';
 
 export { PRICE_CENTS } from '@/lib/charges';
@@ -50,7 +50,16 @@ export async function POST(request: Request) {
     // What actually settled on-chain? A return value means it settled.
     const confirmed = await confirmCharge(signature);
 
-    const result = await settle(session.user.wallet, confirmed);
+    // What was asked for, from the server's own note — never from the body.
+    // No intent means the demo's single price.
+    const intent = intentId ? await getIntent(session.user.wallet, intentId) : null;
+    const result = await settle(
+      session.user.wallet,
+      confirmed,
+      intent
+        ? { amountCents: intent.amountCents, ...(intent.item ? { item: intent.item } : {}) }
+        : undefined,
+    );
     if (!result.ok) return Response.json({ error: result.reason }, { status: 400 });
 
     // The attempt behind this charge is answered, so the sweep can stop asking

@@ -9,17 +9,14 @@
 // the transaction, so the sweep computes the same id as the live path and the
 // single atomic create in `recordCharge` collapses them — no lock, no claim
 // flag, no "already being recovered" state.
-import { HSUSD_MINT, requireTreasury, type ConfirmedCharge } from '@joinbankroll/sdk/server';
+import { HSUSD_MINT, type ConfirmedCharge } from '@joinbankroll/sdk/server';
 
-import { appTokenMints } from '@/lib/app-identity';
+import { appTokenMints, payeeAddress } from '@/lib/app-identity';
+import { CATALOG, DEMO_ITEM } from '@/lib/catalog';
 import { recordCharge, type Charge } from '@/lib/store';
 
-/**
- * The amount this app charges. One price, because the demo is the money loop
- * rather than a catalogue — and the smallest real one, because every charge
- * here moves actual money. A cent is enough to watch it move.
- */
-export const PRICE_CENTS = 1;
+/** The demo's price. What the app really sells is in lib/catalog.ts. */
+export const PRICE_CENTS = CATALOG[DEMO_ITEM]!.amountCents;
 
 /** Why a settled payment was refused — none of these are retryable. */
 export type RejectedReason =
@@ -46,16 +43,20 @@ export type SettleResult =
  * lands, so anyone can attach one to a transfer of their own — a swept charge
  * gets exactly the same scrutiny as one the page reported.
  */
-export async function settle(wallet: string, charge: ConfirmedCharge): Promise<SettleResult> {
-  const treasury = requireTreasury();
+export async function settle(
+  wallet: string,
+  charge: ConfirmedCharge,
+  expected: { amountCents: number; item?: string } = { amountCents: PRICE_CENTS },
+): Promise<SettleResult> {
+  const payee = payeeAddress();
+  if (!payee) throw new Error('No payee — set BANKROLL_TREASURY_KEY or BANKROLL_PAYEE');
   const accepted = appTokenMints();
 
-  if (charge.payee !== treasury.address)
-    return { ok: false, reason: 'payment went to another address' };
+  if (charge.payee !== payee) return { ok: false, reason: 'payment went to another address' };
   if (charge.mint !== HSUSD_MINT && !accepted.includes(charge.mint)) {
     return { ok: false, reason: 'payment was made in another asset' };
   }
-  if (charge.amountCents !== PRICE_CENTS)
+  if (charge.amountCents !== expected.amountCents)
     return { ok: false, reason: 'payment amount does not match' };
   if (charge.payer !== wallet) return { ok: false, reason: 'payment came from another wallet' };
 
@@ -65,6 +66,7 @@ export async function settle(wallet: string, charge: ConfirmedCharge): Promise<S
     charge.slot,
     charge.amountCents,
     charge.mint,
+    expected.item ? { item: expected.item } : undefined,
   );
   return { ok: true, created, charge: recorded };
 }

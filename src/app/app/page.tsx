@@ -6,9 +6,9 @@
 // what it demonstrates (charge → confirm → record, and pay out) is the part
 // worth keeping.
 import { DevTools, type DevRow } from '@joinbankroll/sdk/react';
-import { rpcUrl, treasuryAddress, usingPublicRpc } from '@joinbankroll/sdk/server';
+import { rpcUrl, usingPublicRpc } from '@joinbankroll/sdk/server';
 
-import { appName, appNameConfigured } from '@/lib/app-identity';
+import { appName, appNameConfigured, payeeAddress, payoutsAvailable } from '@/lib/app-identity';
 import { storeDirectory, usingFilesystemStore } from '@/lib/store';
 
 import { Demo } from '../demo';
@@ -16,17 +16,23 @@ import { Demo } from '../demo';
 export const dynamic = 'force-dynamic';
 
 export default function App() {
-  const treasury = treasuryAddress();
+  const payee = payeeAddress();
   const onFilesystem = usingFilesystemStore();
   const storage = onFilesystem || Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-  const ready = Boolean(treasury) && storage;
+  const ready = Boolean(payee) && storage;
 
   const rows: DevRow[] = [
     {
-      label: 'Treasury',
-      value: treasury ?? 'not set',
-      ok: Boolean(treasury),
-      copy: Boolean(treasury),
+      label: 'Payee',
+      value: payee ?? 'not set',
+      ok: Boolean(payee),
+      copy: Boolean(payee),
+    },
+    // Charge-only mode is a valid setup, so "off" is informational, not a fault.
+    {
+      label: 'Payouts',
+      value: payoutsAvailable() ? 'treasury key set' : 'off (charge-only)',
+      ok: true,
     },
     {
       label: 'Storage',

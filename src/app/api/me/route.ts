@@ -1,7 +1,6 @@
 import { getSession } from '@joinbankroll/sdk/next';
-import { treasuryAddress } from '@joinbankroll/sdk/server';
 
-import { appTokens } from '@/lib/app-identity';
+import { appTokens, payeeAddress, payoutsAvailable } from '@/lib/app-identity';
 
 export async function GET(request: Request) {
   const session = await getSession(request);
@@ -19,7 +18,10 @@ export async function GET(request: Request) {
     // Where the user is for THIS session, not where they live. Null when the
     // host didn't report one.
     geo: session.geo ?? null,
-    treasuryConfigured: treasuryAddress() !== null,
+    // Charges need a payee; payouts need the key behind it. In charge-only
+    // mode the first is true and the second false.
+    paymentsConfigured: payeeAddress() !== null,
+    payoutsAvailable: payoutsAvailable(),
     // The app's own tokens, so the client can offer paying with them. Naming
     // the mints here is safe: the manifest already declares them publicly, and
     // that declaration is what bounds what this app may charge.

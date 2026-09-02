@@ -12,7 +12,7 @@
 import { requireIdentity, requireSession, Unauthorized } from '@joinbankroll/sdk/next';
 import { createReference } from '@joinbankroll/sdk/server';
 
-import { PRICE_CENTS } from '@/lib/charges';
+import { DEMO_ITEM, itemFor } from '@/lib/catalog';
 import { CHARGE_EXPIRES_SECONDS } from '@/lib/sweep';
 import { recordIntent } from '@/lib/store';
 
@@ -21,11 +21,20 @@ export async function POST(request: Request) {
     const session = await requireSession(request);
     requireIdentity(session);
 
+    // The client names what it is buying; the catalog says what that costs.
+    // A body-less request is the demo, so the original one-button loop still
+    // works unchanged.
+    const body = (await request.json().catch(() => ({}))) as { item?: string };
+    const itemId = body.item ?? DEMO_ITEM;
+    const item = itemFor(itemId);
+    if (!item) return Response.json({ error: 'unknown item' }, { status: 400 });
+
     const intent = await recordIntent(
       session.user.wallet,
       createReference(),
       crypto.randomUUID(),
-      PRICE_CENTS,
+      item.amountCents,
+      itemId,
     );
 
     // Everything the page needs to make the call, and nothing it decides. The
@@ -37,6 +46,8 @@ export async function POST(request: Request) {
       paymentKey: intent.paymentKey,
       amountCents: intent.amountCents,
       expiresInSeconds: CHARGE_EXPIRES_SECONDS,
+      item: itemId,
+      name: item.name,
     });
   } catch (error) {
     if (error instanceof Unauthorized) {
