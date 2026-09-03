@@ -5,6 +5,7 @@
 //
 //   npm run check -- /app            # one path
 //   npm run check -- /app?level=2 /  # several
+//   npm run check -- --owner /admin # as the app's owner (wallet = payee)
 //
 // The dev server must be running with BANKROLL_MOCK=1 (see .env.example): that
 // is what lets the server accept the stand-in host's token and signatures.
@@ -17,6 +18,10 @@ import { chromium } from 'playwright';
 
 const BASE_URL = process.env.CHECK_BASE_URL ?? 'http://localhost:3000';
 const DEFAULT_PATHS = ['/app'];
+// --owner loads pages as the app's owner: the stand-in user's wallet is the
+// payee, which is what an owner check in the app compares against.
+const OWNER_FLAG = '--owner';
+const OWNER_USERNAME = 'owner';
 const OUT_DIR = 'checks';
 const VIEWPORT = { width: 390, height: 844 };
 const SETTLE_MS = 1500;
@@ -33,16 +38,19 @@ async function readManifest() {
   return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
 }
 
-function fileNameFor(urlPath) {
+function fileNameFor(urlPath, asOwner) {
   const name = urlPath
     .replace(/^\//, '')
     .replace(/[^a-z0-9]+/gi, '-')
     .replace(/^-+|-+$/g, '');
-  return `${name || 'root'}.png`;
+  return `${asOwner ? 'owner-' : ''}${name || 'root'}.png`;
 }
 
 async function main() {
-  const paths = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_PATHS;
+  const args = process.argv.slice(2);
+  const asOwner = args.includes(OWNER_FLAG);
+  const requested = args.filter((arg) => arg !== OWNER_FLAG);
+  const paths = requested.length ? requested : DEFAULT_PATHS;
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   const problems = [];
@@ -60,7 +68,8 @@ async function main() {
     isMobile: true,
     hasTouch: true,
   });
-  await context.addInitScript(mockHostScript({ payee: payee ?? '' }));
+  const user = asOwner ? { wallet: payee ?? '', username: OWNER_USERNAME } : {};
+  await context.addInitScript(mockHostScript({ payee: payee ?? '', ...user }));
 
   for (const urlPath of paths) {
     const page = await context.newPage();
@@ -89,7 +98,7 @@ async function main() {
     } catch (error) {
       found.push(`could not load: ${error.message}`);
     }
-    const file = path.join(OUT_DIR, fileNameFor(urlPath));
+    const file = path.join(OUT_DIR, fileNameFor(urlPath, asOwner));
     await page.screenshot({ path: file, fullPage: false }).catch(() => {});
     console.log(`${found.length === 0 ? 'ok  ' : 'FAIL'} ${urlPath}  →  ${file}`);
     for (const problem of found) {
