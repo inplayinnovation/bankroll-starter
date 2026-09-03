@@ -23,7 +23,9 @@ const DEFAULT_PATHS = ['/app'];
 const OWNER_FLAG = '--owner';
 const OWNER_USERNAME = 'owner';
 const OUT_DIR = 'checks';
-const VIEWPORT = { width: 390, height: 844 };
+// The current base iPhone, in CSS points; the app must also work from 360 to
+// 440 wide.
+const VIEWPORT = { width: 393, height: 852 };
 const SETTLE_MS = 1500;
 const NAVIGATION_TIMEOUT_MS = 45_000;
 const HTTP_ERROR = 400;
