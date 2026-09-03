@@ -39,6 +39,11 @@ const signature = await bankroll.charge({ amountCents: 500 });
 await pay({ to: user.wallet, amountCents: 2500 });
 ```
 
+Money can also land in a wallet you hold no key for: set `BANKROLL_PAYEE` to
+its address instead of a treasury key, and the app takes payments and cannot
+pay out. And `npm run check` drives the app in a headless browser with a
+stand-in host, so a coding agent or CI can test it without a phone.
+
 It moves real mainnet HSUSD. `npm run dev` creates a signing key at `~/.config/bankroll/keypair.json` on first use and hands it to the dev server — it is never written into your project, so it cannot be committed. That key receives payments and signs payouts, so fund it with only what you want to risk, and give a deployment its own.
 
 ## Commands

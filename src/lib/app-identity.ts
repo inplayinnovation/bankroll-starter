@@ -2,11 +2,25 @@
 // connects it. Deployment config rather than source, so a fork never edits the
 // manifest route — and preview and production can differ. (Your icon is a
 // file, not config: public/.well-known/bankroll-icon.png.)
+import { treasuryAddress } from '@joinbankroll/sdk/server';
+
 const DEFAULT_NAME = 'Bankroll Starter';
 
 export const appName = (): string => process.env.BANKROLL_APP_NAME || DEFAULT_NAME;
 
 export const appNameConfigured = (): boolean => Boolean(process.env.BANKROLL_APP_NAME);
+
+// Where charges settle. With a treasury key the address is derived from it, so
+// what the manifest advertises can never drift from the wallet that signs.
+// Without one, BANKROLL_PAYEE names a wallet the app only ever receives at —
+// charge-only mode: the app takes payments and cannot pay anyone out, because
+// it holds no key. Either way this is the address every settled payment is
+// checked against before value is released.
+export const payeeAddress = (): string | null =>
+  treasuryAddress() ?? process.env.BANKROLL_PAYEE ?? null;
+
+/** Payouts need the key, not just the address. */
+export const payoutsAvailable = (): boolean => treasuryAddress() !== null;
 
 // Where your users get help. Bankroll offers it in this app's own menu, and
 // opening it hands the URL to the operating system — so a help page, a

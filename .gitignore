@@ -11,3 +11,6 @@ certificates
 # Local filesystem store (STORE=fs)
 bankroll/
 TRACKER.md
+
+# Screenshots from `npm run check`
+checks/

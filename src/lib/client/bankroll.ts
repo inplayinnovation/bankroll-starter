@@ -24,7 +24,10 @@ export interface Me {
   age: number | null;
   /** Where the user is for this session — not where they live. */
   geo: string | null;
-  treasuryConfigured: boolean;
+  /** A payee is configured, so charges work. */
+  paymentsConfigured: boolean;
+  /** A treasury key is configured, so payouts work too. False in charge-only mode. */
+  payoutsAvailable: boolean;
   /** This app's own tokens. Empty when it issues none. */
   appTokens: { mint: string; name: string }[];
 }
@@ -96,6 +99,8 @@ interface Intent {
   paymentKey: string;
   amountCents: number;
   expiresInSeconds: number;
+  item: string;
+  name: string;
 }
 
 /**
@@ -108,10 +113,18 @@ interface Intent {
  * next visit recovers it. It also mints the key that names this attempt, so a
  * retry of it cannot charge a second time.
  */
-export async function charge(token?: string): Promise<{ ok: boolean; error?: string }> {
-  const intentResponse = await bankrollFetch('/api/charges/intent', { method: 'POST' });
+export async function charge(
+  options: { item?: string; token?: string } = {},
+): Promise<{ ok: boolean; error?: string }> {
+  // `item` names an entry in lib/catalog.ts; omitted, it is the demo charge.
+  const intentResponse = await bankrollFetch('/api/charges/intent', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(options.item ? { item: options.item } : {}),
+  });
   if (!intentResponse.ok) return { ok: false, error: 'could not start the charge' };
   const intent = (await intentResponse.json()) as Intent;
+  const { token } = options;
 
   try {
     // `token` names one of the app's own declared mints; omitted, the charge
@@ -122,6 +135,7 @@ export async function charge(token?: string): Promise<{ ok: boolean; error?: str
       expiresInSeconds: intent.expiresInSeconds,
       idempotencyKey: intent.paymentKey,
       reference: intent.reference,
+      memo: intent.name,
       token,
     });
     const response = await bankrollFetch('/api/charges', {

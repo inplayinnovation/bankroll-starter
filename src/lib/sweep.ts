@@ -62,7 +62,10 @@ export async function sweep(wallet: string): Promise<number> {
         continue;
       }
 
-      const result = await settle(wallet, charge);
+      const result = await settle(wallet, charge, {
+        amountCents: intent.amountCents,
+        ...(intent.item ? { item: intent.item } : {}),
+      });
       if (result.ok) {
         await closeIntent(wallet, intent.id, 'recorded');
         if (result.created) recovered += 1;

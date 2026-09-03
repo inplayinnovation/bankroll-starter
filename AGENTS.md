@@ -28,6 +28,40 @@ themselves are the SDK's, and their cross-backend contract is tested there.
 from any real Blob store; if it fails, stop rather than let a fixture delete
 real data.
 
+## Charge-only mode
+
+Set `BANKROLL_PAYEE` to a wallet address instead of `BANKROLL_TREASURY_KEY`
+and the app takes payments to that address and cannot pay anyone out — it holds
+no key. `payeeAddress()` in `src/lib/app-identity.ts` is the address either way,
+and every settled payment is checked against it; `payoutsAvailable()` is false,
+`/api/me` reports it, and the payout route answers 501. Use this when the money
+should land in a wallet whose key lives elsewhere (a Bankroll user's own wallet,
+for instance).
+
+## What the app sells
+
+`src/lib/catalog.ts` lists the items and their prices in cents. The client asks
+for an intent by item id (`charge({ item: 'premium' })`), the server prices it
+from the catalog, and the settled amount is checked against the intent's price —
+so a price lives in one file and never in a request body. Add an entry per thing
+you sell; the demo's single cent is the entry named `demo`.
+
+## Testing without a phone
+
+```bash
+BANKROLL_MOCK=1 npx next dev      # or put BANKROLL_MOCK=1 in .env.local
+npm run check -- /app             # headless phone-sized Chromium, fake host
+npm run check -- /app?tab=history /
+npm run check -- --owner /admin   # the same, signed in as the app's owner
+```
+
+`npm run check` loads each path with `@joinbankroll/sdk/mock`'s stand-in host
+injected, so the client SDK reports `ready`, `session()` answers as `@tester`
+with a verified identity, and `charge()` completes with a made-up signature the
+server accepts. It fails on any console error, page error, or failed request,
+and writes screenshots to `checks/`. Look at them. Real money moves only inside
+the Bankroll app; the flag is ignored in production builds.
+
 ## Setup (local)
 
 **Local development needs nothing.** `npm create @joinbankroll/app` writes
@@ -116,8 +150,8 @@ request body. The payer is the verified session, never a client field.
 
 ```ts
 const charge = await confirmCharge(signature);
-if (charge.payee !== treasury.address) return reject();   // never skip this one
-if (charge.amountCents !== PRICE_CENTS) return reject();
+if (charge.payee !== payeeAddress()) return reject();      // never skip this one
+if (charge.amountCents !== intent.amountCents) return reject();
 if (charge.payer !== session.user.wallet) return reject();
 ```
 

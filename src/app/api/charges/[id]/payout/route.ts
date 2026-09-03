@@ -25,6 +25,7 @@ import {
   sendPayout,
 } from '@joinbankroll/sdk/server';
 
+import { payoutsAvailable } from '@/lib/app-identity';
 import { getCharge, updateCharge, type Charge } from '@/lib/store';
 
 class NotPayable extends Error {
@@ -36,6 +37,14 @@ class NotPayable extends Error {
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // Charge-only mode: BANKROLL_PAYEE names where money arrives, and nothing
+    // here can sign a transfer out of it.
+    if (!payoutsAvailable()) {
+      return Response.json(
+        { error: 'payouts are not available: this app has no treasury key' },
+        { status: 501 },
+      );
+    }
     const session = await requireSession(request);
     requireIdentity(session);
     const signer = requireTreasury();
