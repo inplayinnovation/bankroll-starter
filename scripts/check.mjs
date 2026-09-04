@@ -6,6 +6,7 @@
 //   npm run check -- /app            # one path
 //   npm run check -- /app?level=2 /  # several
 //   npm run check -- --owner /admin # as the app's owner (wallet = payee)
+//   npm run check -- --admin-probe   # only the player probe of /api/admin
 //
 // The dev server must be running with BANKROLL_MOCK=1 (see .env.example): that
 // is what lets the server accept the stand-in host's token and signatures.
@@ -13,7 +14,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { mockHostScript } from '@joinbankroll/sdk/mock';
+import { BANKROLL_TOKEN_HEADER } from '@joinbankroll/sdk';
+import { mockHostScript, mockToken } from '@joinbankroll/sdk/mock';
 import { chromium } from 'playwright';
 
 const BASE_URL = process.env.CHECK_BASE_URL ?? 'http://localhost:3000';
@@ -22,6 +24,15 @@ const DEFAULT_PATHS = ['/app'];
 // payee, which is what an owner check in the app compares against.
 const OWNER_FLAG = '--owner';
 const OWNER_USERNAME = 'owner';
+// The admin route, if the app has one, must refuse everyone but the owner
+// before it reads anything. It is probed as an ordinary player after the
+// pages, or alone with --admin-probe. The only good answers: 401 or 403, or
+// 404 and 405 for an app with no such route or method. The builder refuses to
+// publish an app that fails this.
+const ADMIN_PROBE_FLAG = '--admin-probe';
+const ADMIN_ROUTE = '/api/admin';
+const ADMIN_METHODS = ['POST', 'GET'];
+const ADMIN_OK_STATUSES = new Set([401, 403, 404, 405]);
 const OUT_DIR = 'checks';
 // The current base iPhone, in CSS points; the app must also work from 360 to
 // 440 wide.
@@ -40,6 +51,34 @@ async function readManifest() {
   return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
 }
 
+async function probeAdmin() {
+  const problems = [];
+  const headers = { [BANKROLL_TOKEN_HEADER]: mockToken(), 'content-type': 'application/json' };
+  for (const method of ADMIN_METHODS) {
+    let status;
+    try {
+      const response = await fetch(`${BASE_URL}${ADMIN_ROUTE}`, {
+        method,
+        headers,
+        body: method === 'POST' ? '{}' : undefined,
+      });
+      status = response.status;
+    } catch (error) {
+      problems.push(`${method} ${ADMIN_ROUTE}: ${error.message}`);
+      continue;
+    }
+    if (ADMIN_OK_STATUSES.has(status)) continue;
+    problems.push(
+      `${method} ${ADMIN_ROUTE} answered ${status} to an ordinary player; it must answer 401 or 403 before reading anything`,
+    );
+  }
+  console.log(
+    `${problems.length === 0 ? 'ok  ' : 'FAIL'} ${ADMIN_ROUTE} refuses an ordinary player`,
+  );
+  for (const problem of problems) console.log(`      ${problem}`);
+  return problems;
+}
+
 function fileNameFor(urlPath, asOwner) {
   const name = urlPath
     .replace(/^\//, '')
@@ -51,11 +90,17 @@ function fileNameFor(urlPath, asOwner) {
 async function main() {
   const args = process.argv.slice(2);
   const asOwner = args.includes(OWNER_FLAG);
-  const requested = args.filter((arg) => arg !== OWNER_FLAG);
+  const probeOnly = args.includes(ADMIN_PROBE_FLAG);
+  const requested = args.filter((arg) => arg !== OWNER_FLAG && arg !== ADMIN_PROBE_FLAG);
   const paths = requested.length ? requested : DEFAULT_PATHS;
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   const problems = [];
+  if (probeOnly) {
+    problems.push(...(await probeAdmin()));
+    if (problems.length > 0) process.exit(1);
+    return;
+  }
   const manifest = await readManifest();
   const payee = manifest.capabilities?.payments;
   if (!manifest.name) problems.push('manifest: no app name (BANKROLL_APP_NAME)');
@@ -111,6 +156,7 @@ async function main() {
   }
 
   await browser.close();
+  problems.push(...(await probeAdmin()));
   if (problems.length > 0) {
     console.log(`\n${problems.length} problem(s). Fix them and run the check again.`);
     process.exit(1);

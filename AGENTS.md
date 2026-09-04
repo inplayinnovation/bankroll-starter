@@ -53,6 +53,7 @@ BANKROLL_MOCK=1 npx next dev      # or put BANKROLL_MOCK=1 in .env.local
 npm run check -- /app             # headless phone-sized Chromium, fake host
 npm run check -- /app?tab=history /
 npm run check -- --owner /admin   # the same, signed in as the app's owner
+npm run check -- --admin-probe    # only the player probe of /api/admin (also runs after every check)
 ```
 
 `npm run check` loads each path with `@joinbankroll/sdk/mock`'s stand-in host
