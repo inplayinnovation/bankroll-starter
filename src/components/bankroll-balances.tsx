@@ -10,7 +10,7 @@ export function BankrollBalances() {
   const state = useBalances();
 
   return (
-    <dl aria-label="Bankroll balances" className="ml-auto min-w-0 max-w-[65%] space-y-2 text-right">
+    <dl aria-label="Bankroll balances" className="min-w-0 space-y-2 text-right">
       <div>
         <dt className="text-xs text-neutral-400">
           Bankroll <span className="sr-only">balance</span>

@@ -65,7 +65,7 @@ Everything that is not your app comes from [`@joinbankroll/sdk`](https://www.npm
 
 ## Make it yours
 
-What ships is a skeleton, not a product: the session Bankroll signs — wallet, identity, location, age — arrives verified, the money path is wired, and the surface is a placeholder. Replace it and sell rounds of golf, contest entries, tips, loot boxes — whatever you're building. Open the project in Claude Code, Cursor, or Codex and ask:
+What ships is a skeleton, not a product: the session Bankroll signs — wallet, identity, location, age — can be verified on your server, the money path is wired, and the surface is empty. Build rounds of golf, contest entries, tips, loot boxes — whatever you're making. Open the project in Claude Code, Cursor, or Codex and ask:
 
 > Set up this Bankroll app so it can take payments.
 
@@ -73,9 +73,10 @@ What ships is a skeleton, not a product: the session Bankroll signs — wallet, 
 
 ## Shared app UI
 
-The app header shows the app name on the left and the user's Bankroll balance
-on the right. Replace
+The `/app` shell keeps content inside the phone's safe area. Its header shows
+the user's Bankroll balance at the top right. Replace
 [`home.tsx`](./src/app/app/home.tsx) to build your surface; the header stays.
+The public site has its own layout.
 
 [`BankrollBalances`](./src/components/bankroll-balances.tsx) reads
 [`bankroll.balances()`](https://docs.joinbankroll.com/build/balances) from the

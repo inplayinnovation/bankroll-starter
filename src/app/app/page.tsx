@@ -60,8 +60,7 @@ export default function App() {
 
   return (
     <Gate ready={ready} devTools={devTools}>
-      <header className="flex items-start justify-between gap-4">
-        <p className="min-w-0 wrap-anywhere font-semibold">{appName()}</p>
+      <header className="flex justify-end">
         <BankrollBalances />
       </header>
       <Home />

@@ -111,12 +111,14 @@ Three conventions that split implies:
   view on load.
 
 What ships is a skeleton rather than a product: the entry gates, the verified
-session, the shared app header, and the money path in `src/lib`, under a
-placeholder surface. Replacing the surface with the thing you're actually
+session, the shared app header, and the money path in `src/lib`, with an
+empty surface. Replacing the surface with the thing you're actually
 selling is expected — the money-path rules below are what carries over.
 
 - `src/app/app/home.tsx` — the app's surface, and the file you replace. It is
   not a wallet: the host is.
+- `src/app/app/layout.tsx` — the phone shell and its viewport configuration.
+  The root layout stays bare; the public site supplies its own frame.
 - `src/app/app/gate.tsx` — the entry gates: hydration, configuration, host
   status. Every surface renders inside them; `page.tsx` stays a thin shell
   that wires the shared header and surface together. Leave both alone when
@@ -144,10 +146,20 @@ route from `/next`; the treasury, charge confirmation, and payouts from
 
 ## Shared app UI
 
-**Keep the app name and Bankroll balances in the shared header.** `page.tsx`
+**Apply safe-area padding once, on the app shell.** `/app` exports
+`viewportFit: 'cover'`; `.app-shell` in `src/app/globals.css` uses
+`env(safe-area-inset-*)` to keep content clear of the notch, status bar, and
+home indicator. Padding is the larger of the device inset and the normal
+spacing (2.5rem vertically, 1.25rem horizontally). Keep the header and surface
+inside that shell without adding a second inset. A phone-sized browser viewport
+alone does not simulate a notch; check on a device or override the browser's
+safe-area insets when checking layout.
+
+**The shared header shows Bankroll balances at the top right.** `page.tsx`
 renders it inside `Gate`, above `Home`, so replacing the surface preserves it.
-The app name is a label, not a link. Reuse `BankrollBalances` rather than reading
-or formatting balances in each surface.
+It supplies only the balance display; the surface owns its branding and game
+controls. Reuse `BankrollBalances` rather than reading or formatting balances
+in each surface.
 
 **Host balances are for display only.** `useBalances()` calls
 [`bankroll.balances()`](https://docs.joinbankroll.com/build/balances) on mount,

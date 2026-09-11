@@ -21,7 +21,7 @@ export default async function Home() {
   const href = origin.startsWith('https://') ? playLink(`${origin}${APP_PATH}`) : null;
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-8 text-center">
+    <main className="flex min-h-screen w-full flex-col items-center justify-center gap-8 px-6 py-10 text-center">
       <div className="flex flex-col gap-3">
         <h1 className="text-4xl font-semibold tracking-tight">{appName()}</h1>
         <p className="max-w-xs text-neutral-400">Runs inside the Bankroll app.</p>
