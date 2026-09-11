@@ -8,7 +8,7 @@ cd my-app
 npm run dev
 ```
 
-`npm run dev` prints a QR. Scan it: your app opens inside Bankroll and starts taking payments and paying them back out, hot reload included.
+`npm run dev` prints a QR. Scan it: your app opens inside Bankroll, ready to take payments and pay them back out, hot reload included.
 
 No account. No signup. No API key. Nothing to register.
 
@@ -65,11 +65,23 @@ Everything that is not your app comes from [`@joinbankroll/sdk`](https://www.npm
 
 ## Make it yours
 
-What ships is a demo, not a product: it shows you the session Bankroll signs — wallet, identity, location, age — then charges a cent and pays the same cent back, so both directions of the money loop are visible. Delete it and sell rounds of golf, contest entries, tips, loot boxes — whatever you're building. Open the project in Claude Code, Cursor, or Codex and ask:
+What ships is a skeleton, not a product: the session Bankroll signs — wallet, identity, location, age — arrives verified, the money path is wired, and the surface is a placeholder. Replace it and sell rounds of golf, contest entries, tips, loot boxes — whatever you're building. Open the project in Claude Code, Cursor, or Codex and ask:
 
 > Set up this Bankroll app so it can take payments.
 
 [`AGENTS.md`](./AGENTS.md) has what your agent needs: the routes, the rules money code has to follow, and how to deploy it.
+
+## Templates
+
+Every branch of this repo is a template — `main` is the skeleton, and each
+branch is a reference app built on it. Scaffold one with:
+
+```bash
+npm create @joinbankroll/app@latest my-app -- --template demo
+```
+
+- [`demo`](../../tree/demo) — the money loop on one screen: the signed
+  session's claims, a one-cent charge, and the payout that returns it.
 
 ## Links
 

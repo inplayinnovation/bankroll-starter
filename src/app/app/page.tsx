@@ -2,16 +2,17 @@
 // landing page that sends them here, the same split a real app has.
 //
 // This page stays a shell: it works out whether the app is configured, builds
-// the developer rows, and renders one component. Swap that component for yours;
-// what it demonstrates (charge → confirm → record, and pay out) is the part
-// worth keeping.
+// the developer rows, and renders the surface inside the entry gates. The
+// surface lives in home.tsx; this file and gate.tsx are the part branches
+// leave alone.
 import { DevTools, type DevRow } from '@joinbankroll/sdk/react';
 import { rpcUrl, usingPublicRpc } from '@joinbankroll/sdk/server';
 
 import { appName, appNameConfigured, payeeAddress, payoutsAvailable } from '@/lib/app-identity';
 import { storeDirectory, usingFilesystemStore } from '@/lib/store';
 
-import { Demo } from '../demo';
+import { Gate } from './gate';
+import { Home } from './home';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,5 +57,9 @@ export default function App() {
   // runs, and only in development.
   const devTools = process.env.NODE_ENV === 'development' ? <DevTools rows={rows} /> : null;
 
-  return <Demo ready={ready} devTools={devTools} />;
+  return (
+    <Gate ready={ready} devTools={devTools}>
+      <Home />
+    </Gate>
+  );
 }

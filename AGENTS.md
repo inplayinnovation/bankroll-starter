@@ -110,13 +110,16 @@ Three conventions that split implies:
   so back closes them, and let deep links (an invite) win over the default
   view on load.
 
-What ships is a demo rather than a product: it displays the session claims, then
-charges a cent and pays the same cent back so both directions of the money loop are
-visible. Replacing it with the thing you're actually selling is expected — the
+What ships is a skeleton rather than a product: the entry gates, the verified
+session, and the money path in `src/lib`, under a placeholder surface.
+Replacing the surface with the thing you're actually selling is expected — the
 money-path rules below are what carries over.
 
-- `src/app/demo.tsx` — the app's surface. Delete it and render your own from
-  `/app`, which stays a thin shell. It is not a wallet: the host is.
+- `src/app/app/home.tsx` — the app's surface, and the file you replace. It is
+  not a wallet: the host is.
+- `src/app/app/gate.tsx` — the entry gates: hydration, configuration, host
+  status. Every surface renders inside them; `page.tsx` stays a thin shell
+  that wires the two together. Leave both alone.
 - `src/app/api/charges/` — the money. `route.ts` takes a charge and lists them;
   `intent/` starts one; `[id]/payout` pays one back out.
 - `src/lib/charges.ts` — the price, and the checks a settled payment must pass.
