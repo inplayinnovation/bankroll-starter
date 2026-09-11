@@ -71,6 +71,20 @@ What ships is a skeleton, not a product: the session Bankroll signs — wallet, 
 
 [`AGENTS.md`](./AGENTS.md) has what your agent needs: the routes, the rules money code has to follow, and how to deploy it.
 
+## Shared app UI
+
+The app header shows the app name on the left and the user's Bankroll balance
+on the right. Replace
+[`home.tsx`](./src/app/app/home.tsx) to build your surface; the header stays.
+
+[`BankrollBalances`](./src/components/bankroll-balances.tsx) reads
+[`bankroll.balances()`](https://docs.joinbankroll.com/build/balances) from the
+host and refreshes while the app is visible. Cash and app credits form one
+Bankroll dollar balance; declared tokens have their own named balances.
+This is a display, never an authorization check; charges and payouts still use
+the server's money path. A host without this prerelease capability shows an
+update hint without blocking the app.
+
 ## Templates
 
 Every branch of this repo is a template — `main` is the skeleton, and each

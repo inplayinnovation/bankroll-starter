@@ -2,12 +2,13 @@
 // landing page that sends them here, the same split a real app has.
 //
 // This page stays a shell: it works out whether the app is configured, builds
-// the developer rows, and renders the surface inside the entry gates. The
-// surface lives in home.tsx; this file and gate.tsx are the part branches
+// the developer rows, and renders the header and surface inside the entry gates.
+// The surface lives in home.tsx; this file and gate.tsx are the part branches
 // leave alone.
 import { DevTools, type DevRow } from '@joinbankroll/sdk/react';
 import { rpcUrl, usingPublicRpc } from '@joinbankroll/sdk/server';
 
+import { BankrollBalances } from '@/components/bankroll-balances';
 import { appName, appNameConfigured, payeeAddress, payoutsAvailable } from '@/lib/app-identity';
 import { storeDirectory, usingFilesystemStore } from '@/lib/store';
 
@@ -59,6 +60,10 @@ export default function App() {
 
   return (
     <Gate ready={ready} devTools={devTools}>
+      <header className="flex items-start justify-between gap-4">
+        <p className="min-w-0 wrap-anywhere font-semibold">{appName()}</p>
+        <BankrollBalances />
+      </header>
       <Home />
     </Gate>
   );

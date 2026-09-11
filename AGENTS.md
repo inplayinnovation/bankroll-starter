@@ -111,15 +111,18 @@ Three conventions that split implies:
   view on load.
 
 What ships is a skeleton rather than a product: the entry gates, the verified
-session, and the money path in `src/lib`, under a placeholder surface.
-Replacing the surface with the thing you're actually selling is expected — the
-money-path rules below are what carries over.
+session, the shared app header, and the money path in `src/lib`, under a
+placeholder surface. Replacing the surface with the thing you're actually
+selling is expected — the money-path rules below are what carries over.
 
 - `src/app/app/home.tsx` — the app's surface, and the file you replace. It is
   not a wallet: the host is.
 - `src/app/app/gate.tsx` — the entry gates: hydration, configuration, host
   status. Every surface renders inside them; `page.tsx` stays a thin shell
-  that wires the two together. Leave both alone.
+  that wires the shared header and surface together. Leave both alone when
+  replacing the surface.
+- `src/components/bankroll-balances.tsx` — the host balance display at the top
+  right, backed by `src/lib/client/balances.ts`.
 - `src/app/api/charges/` — the money. `route.ts` takes a charge and lists them;
   `intent/` starts one; `[id]/payout` pays one back out.
 - `src/lib/charges.ts` — the price, and the checks a settled payment must pass.
@@ -138,6 +141,30 @@ Everything that is not this app comes from `@joinbankroll/sdk` and updates with
 route from `/next`; the treasury, charge confirmation, and payouts from
 `/server`; the store backends from `/store`; the dev overlay and host hooks from
 `/react`.
+
+## Shared app UI
+
+**Keep the app name and Bankroll balances in the shared header.** `page.tsx`
+renders it inside `Gate`, above `Home`, so replacing the surface preserves it.
+The app name is a label, not a link. Reuse `BankrollBalances` rather than reading
+or formatting balances in each surface.
+
+**Host balances are for display only.** `useBalances()` calls
+[`bankroll.balances()`](https://docs.joinbankroll.com/build/balances) on mount,
+every two seconds while visible, and when the page regains focus or visibility.
+The host reads its own live balance store; the app does not query a wallet or
+derive a balance from charges. Cash and app credits arrive in cents: add
+`cashCents + creditsCents` and display them as one Bankroll dollar balance.
+Token amounts arrive in whole tokens with up to nine decimal places; show
+those separately using the names the host supplies from the manifest.
+Declared tokens remain visible even at zero.
+
+Loading and failed reads never display a made-up zero. A failed refresh clears
+the old amount and retries on the next refresh. `balances()` is a prerelease
+SDK capability: an older host may answer `update_required` even when sessions
+work. The header shows an update hint and the rest of the app keeps working.
+Never authorize play, price an order, or release value against this client
+display; settled charges and server records remain authoritative.
 
 ## Money-path rules
 
