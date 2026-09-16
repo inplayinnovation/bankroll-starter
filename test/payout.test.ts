@@ -222,8 +222,11 @@ describe('a Bankroll server wallet', () => {
     Object.assign(process.env, SERVER_WALLET_ENV);
   });
 
-  it('is the payee, pays out, and is owned by BANKROLL_OWNER', () => {
+  it('is the payee, pays out, and is owned by BANKROLL_OWNER — known by the wallet id, key or no key', () => {
     expect(serverWalletConfigured()).toBe(true);
+    delete process.env.BANKROLL_DELEGATED_KEY;
+    expect(serverWalletConfigured()).toBe(true);
+    expect(payoutsAvailable()).toBe(true);
     expect(payeeAddress()).toBe(SERVER_WALLET_ENV.BANKROLL_PAYEE);
     expect(payoutsAvailable()).toBe(true);
     expect(ownerAddress()).toBe(SERVER_WALLET_ENV.BANKROLL_OWNER);

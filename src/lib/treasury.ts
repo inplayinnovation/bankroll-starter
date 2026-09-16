@@ -13,6 +13,7 @@
 //    signs with itself. What `npm run dev` gives you.
 // 3. Charge-only — BANKROLL_PAYEE alone names a wallet the app can receive at
 //    and cannot pay out of.
+import { mockEnabled, mockPayoutSigner } from '@joinbankroll/sdk/mock';
 import {
   delegatedPrivySigner,
   requireTreasury,
@@ -20,8 +21,12 @@ import {
   type PaymentSigner,
 } from '@joinbankroll/sdk/server';
 
-/** True when the deployment has a Bankroll server wallet. */
-export const serverWalletConfigured = (): boolean => Boolean(process.env.BANKROLL_DELEGATED_KEY);
+/**
+ * True when the deployment has a Bankroll server wallet. Keyed on the wallet
+ * id, not the key: a coding agent's dev server has the id and the payee but
+ * never the key, and must still know that payouts are part of this app.
+ */
+export const serverWalletConfigured = (): boolean => Boolean(process.env.BANKROLL_DELEGATED_WALLET_ID);
 
 /**
  * Where charges settle, and the address every settled payment is checked
@@ -49,6 +54,12 @@ export const payoutsAvailable = (): boolean =>
  * to a server wallet, which dedupes it for 24h: resending the same bytes
  * under the same key resolves to the original signature, never a second
  * transfer. A keypair ignores it; its signatures are deterministic anyway.
+ *
+ * Under the mock (BANKROLL_MOCK=1 outside production — a coding agent's dev
+ * server, `npm run check`) payouts are simulated the way charges are: the
+ * signer answers with a made-up signature and no money moves.
  */
-export const payoutSigner = (idempotencyKey: string): PaymentSigner =>
-  serverWalletConfigured() ? delegatedPrivySigner({ idempotencyKey }) : requireTreasury();
+export function payoutSigner(idempotencyKey: string): PaymentSigner {
+  if (mockEnabled()) return mockPayoutSigner(payeeAddress() ?? '');
+  return serverWalletConfigured() ? delegatedPrivySigner({ idempotencyKey }) : requireTreasury();
+}
