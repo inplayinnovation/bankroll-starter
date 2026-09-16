@@ -1,5 +1,5 @@
-// The wallet this app takes money into and pays out of. Three shapes, and
-// this file is the one place that says which one a deployment is:
+// The wallet this app takes money into and pays out of. Two shapes, and this
+// file is the one place that says which one a deployment is:
 //
 // 1. A Bankroll server wallet — what the in-app builder gives an app, and
 //    what `bankroll-admin server-wallet:create` provisions for a self-hosted
@@ -11,8 +11,6 @@
 //    BANKROLL_PRIVY_APP_ID and BANKROLL_OWNER.
 // 2. A keypair — BANKROLL_TREASURY_KEY, a base58 Solana secret key the app
 //    signs with itself. What `npm run dev` gives you.
-// 3. Charge-only — BANKROLL_PAYEE alone names a wallet the app can receive at
-//    and cannot pay out of.
 import { mockEnabled, mockPayoutSigner } from '@joinbankroll/sdk/mock';
 import {
   delegatedPrivySigner,
@@ -33,21 +31,13 @@ export const serverWalletConfigured = (): boolean => Boolean(process.env.BANKROL
  * against before value is released. Null when nothing is configured.
  */
 export const payeeAddress = (): string | null =>
-  serverWalletConfigured()
-    ? process.env.BANKROLL_PAYEE || null
-    : (treasuryAddress() ?? process.env.BANKROLL_PAYEE ?? null);
+  serverWalletConfigured() ? process.env.BANKROLL_PAYEE || null : treasuryAddress();
 
 /**
  * The owner: the person the admin screen belongs to. The server wallet's
- * owner for shape 1, the keypair's own address for shape 2, the payee for
- * charge-only, where the payee IS the creator's wallet.
+ * owner for shape 1; the keypair's own address for shape 2.
  */
-export const ownerAddress = (): string | null =>
-  process.env.BANKROLL_OWNER || (serverWalletConfigured() ? null : payeeAddress());
-
-/** Payouts need something that can sign, not just an address. */
-export const payoutsAvailable = (): boolean =>
-  serverWalletConfigured() || treasuryAddress() !== null;
+export const ownerAddress = (): string | null => process.env.BANKROLL_OWNER || treasuryAddress();
 
 /**
  * The signer for one payout attempt. The idempotency key names the attempt

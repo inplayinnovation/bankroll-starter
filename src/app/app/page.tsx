@@ -10,7 +10,7 @@ import { rpcUrl, usingPublicRpc } from '@joinbankroll/sdk/server';
 
 import { BankrollBalances } from '@/components/bankroll-balances';
 import { appName, appNameConfigured } from '@/lib/app-identity';
-import { payeeAddress, payoutsAvailable, serverWalletConfigured } from '@/lib/treasury';
+import { payeeAddress } from '@/lib/treasury';
 import { storeDirectory, usingFilesystemStore } from '@/lib/store';
 
 import { Gate } from './gate';
@@ -30,12 +30,6 @@ export default function App() {
       value: payee ?? 'not set',
       ok: Boolean(payee),
       copy: Boolean(payee),
-    },
-    // Charge-only mode is a valid setup, so "off" is informational, not a fault.
-    {
-      label: 'Payouts',
-      value: serverWalletConfigured() ? 'server wallet' : payoutsAvailable() ? 'treasury key set' : 'off (charge-only)',
-      ok: true,
     },
     {
       label: 'Storage',

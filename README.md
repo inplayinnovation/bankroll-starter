@@ -42,9 +42,7 @@ await pay({ to: user.wallet, amountCents: 2500 });
 An app built in Bankroll's in-app builder runs on a **server wallet** instead:
 a wallet Bankroll created for it, owned by its creator, that the app pays out
 of with its own key through Bankroll (`src/lib/treasury.ts` explains the
-variables). Money can also land in a wallet you hold no key for: set
-`BANKROLL_PAYEE` to its address alone, and the app takes payments and cannot
-pay out. And `npm run check` drives the app in a headless browser with a
+variables). And `npm run check` drives the app in a headless browser with a
 stand-in host, so a coding agent or CI can test it without a phone.
 
 It moves real mainnet HSUSD. `npm run dev` creates a signing key at `~/.config/bankroll/keypair.json` on first use and hands it to the dev server — it is never written into your project, so it cannot be committed. That key receives payments and signs payouts, so fund it with only what you want to risk, and give a deployment its own.
@@ -99,7 +97,7 @@ npm create @joinbankroll/app@latest my-app -- --template demo
 ```
 
 - [`demo`](../../tree/demo) — the money loop on one screen: the signed
-  session's claims, a one-cent charge, and the payout that returns it.
+  session's claims.
 
 ## Links
 

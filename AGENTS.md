@@ -31,24 +31,6 @@ themselves are the SDK's, and their cross-backend contract is tested there.
 from any real Blob store; if it fails, stop rather than let a fixture delete
 real data.
 
-## Charge-only mode
-
-Set `BANKROLL_PAYEE` to a wallet address instead of `BANKROLL_TREASURY_KEY`
-and the app takes payments to that address and cannot pay anyone out — it holds
-no key. `payeeAddress()` in `src/lib/app-identity.ts` is the address either way,
-and every settled payment is checked against it; `payoutsAvailable()` is false,
-`/api/me` reports it, and the payout route answers 501. Use this when the money
-should land in a wallet whose key lives elsewhere (a Bankroll user's own wallet,
-for instance).
-
-## What the app sells
-
-`src/lib/catalog.ts` lists the items and their prices in cents. The client asks
-for an intent by item id (`charge({ item: 'premium' })`), the server prices it
-from the catalog, and the settled amount is checked against the intent's price —
-so a price lives in one file and never in a request body. Add an entry per thing
-you sell; the demo's single cent is the entry named `demo`.
-
 ## Testing without a phone
 
 ```bash
@@ -128,12 +110,8 @@ selling is expected — the money-path rules below are what carries over.
   replacing the surface.
 - `src/components/bankroll-balances.tsx` — the host balance display at the top
   right, backed by `src/lib/client/balances.ts`.
-- `src/app/api/charges/` — the money. `route.ts` takes a charge and lists them;
-  `intent/` starts one; `[id]/payout` pays one back out.
-- `src/lib/charges.ts` — the price, and the checks a settled payment must pass.
-  Both the live path and the sweep go through it, so they cannot drift apart.
-- `src/lib/sweep.ts` — finding charges that settled but were never reported.
-- `src/lib/store.ts` — this app's durable state; see Storage.
+- `src/lib/store.ts` — the store backend this app writes documents to; see
+  Storage.
 - `src/lib/app-identity.ts` — how the app introduces itself in the manifest:
   its name, where it boots, the tokens it issues, and `BANKROLL_SUPPORT_URL`,
   which puts a "Help with <app>" item in Bankroll's own menu. Any URL works —
@@ -180,105 +158,6 @@ SDK capability: an older host may answer `update_required` even when sessions
 work. The header shows an update hint and the rest of the app keeps working.
 Never authorize play, price an order, or release value against this client
 display; settled charges and server records remain authoritative.
-
-## Money-path rules
-
-**0. Every fact about the user comes from the verified session.** `wallet`,
-`username`, `identity`, `geo`, `age` are read server-side from the signed token
-(`requireSession` → `verifyToken`, audience pinned to this origin). The client
-bridge exposes no user data — only `status()`, `charge()`, `session()` (a token,
-not a profile). Never take any of these from a request body.
-
-**1. Server computes amounts.** The price is a server constant, never the
-request body. The payer is the verified session, never a client field.
-
-**2. Check payee, amount, and payer before releasing value.**
-
-```ts
-const charge = await confirmCharge(signature);
-if (charge.payee !== payeeAddress()) return reject();      // never skip this one
-if (charge.amountCents !== intent.amountCents) return reject();
-if (charge.payer !== session.user.wallet) return reject();
-```
-
-Skipping the payee check is the common, expensive bug: a transfer the user sent
-to their own second wallet passes the other two.
-
-**3. One atomic write both records the charge and guards the replay.** The id
-is derived from the transaction (`sortableId(charge.slot, signature)`), so a second
-attempt computes the same id and the create fails — there is no separate "spend
-the signature" step to leave half-finished.
-
-```ts
-const { created, charge } = await recordCharge(wallet, signature, slot, amountCents, mint);
-// created === false means a retry or replay — already satisfied, not an error.
-```
-
-**4. The payout runs on the charge's own document.** The whole payout lifecycle
-is compare-and-swap on one key, so nothing spans two documents. The order is
-build → sign → **store** → send → confirm: the `held → paying` transition
-records the transaction's *signature* and expiry (signing is deterministic, so
-the id exists before anything is broadcast), and only then is it sent. A stuck
-`paying` charge is resolved by `confirmPayout(stored signature)` — never by
-resending, whose rejection can't say whether an earlier submission landed.
-`expired` is ledger-searched proof the attempt never landed and never can; it
-is the only outcome that licenses building a fresh transaction, so a second
-payout for the same charge cannot exist while the first might still be live.
-On any other `PayError` the charge stays `paying` — ask again later.
-
-**5. Write down what you are about to charge, before you charge it.** `charge()`
-gives the signature to the page, and the page gives it to you. If the page dies
-in between — app killed, connection dropped, battery flat — the payment still
-settled, and nothing you hold points to it. So the server mints a `reference`
-first and stores it with the attempt; the payment carries it on-chain, and the
-charge stays findable by an id that existed before it did.
-
-```ts
-const intent = await recordIntent(wallet, createReference(), crypto.randomUUID(), PRICE_CENTS);
-// the page passes intent.reference and intent.paymentKey to charge()
-const charge = await findChargeByReference(intent.reference);   // later, if it never reported
-```
-
-Mint both server-side. A reference the page invents is one the page can lose,
-reuse, or forget to send, and the same is true of the key that stops a retry
-charging twice.
-
-A found charge is a candidate, not a receipt. A reference is public once it
-lands, so anyone can attach it to a transfer of their own — run rule 2's checks
-on it exactly as you would on one the page reported, which is why both paths
-call the same `settle()`.
-
-Recovery costs nothing extra to make safe: the charge id still comes from the
-transaction, so a sweep that finds a payment computes the same id as the live
-path and rule 3's atomic create collapses them. No lock, no "being recovered"
-state.
-
-**Sweep on whether an attempt was answered, never on how old it is.** Age says
-when a payment can still *arrive* — a transaction cannot land once its blockhash
-has died. It says nothing about whether one already arrived while nobody was
-watching, which is the entire case this exists for. Someone who pays, loses the
-page, and comes back an hour later must still be recovered. Age decides only
-when a chain that has never heard of an attempt turns "not yet" into "never", at
-which point the attempt is closed as `unpaid` and never asked about again.
-
-Two limits worth knowing before you build on this:
-
-- **One intent per attempt, keyed under the wallet.** Keeping only a wallet's
-  latest attempt would erase an unresolved one the moment the user tried again —
-  losing the reference for a payment that had already settled. If you sell more
-  than one thing, key intents per *order* rather than per attempt and carry the
-  order id on the document.
-- **`findChargeByReference` returns one candidate**, the oldest transfer
-  carrying the reference that parses as a payment. A transaction carrying your
-  reference that lands *first* therefore hides the real charge. It takes someone
-  who knows the reference and is willing to spend real money, but there is no
-  way to recover from it in the app — treat a reference as something to keep out
-  of logs and URLs.
-
-**Refuse rather than charge without a reference.** Passing one needs a Bankroll
-app new enough to carry it, and the SDK rejects `update_required` on anything
-older. Ask for the update. Silently charging without a reference is exactly the
-payment you cannot find later.
 
 ## Storage
 
