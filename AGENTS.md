@@ -7,6 +7,9 @@ takes payments and remembers what was bought.
 
 Platform docs: https://docs.joinbankroll.com/llms-full.txt
 
+[anatomy.md](./anatomy.md) describes the suggested screen layout and flow:
+Home, Results, gameplay, and each game's result.
+
 ## Commands
 
 ```bash
