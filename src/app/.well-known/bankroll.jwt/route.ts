@@ -12,7 +12,8 @@
 // do, Bankroll shows a monogram of your app's name.
 import { manifestRoute } from '@joinbankroll/sdk/next';
 
-import { APP_PATH, appName, appTokens, payeeAddress, supportUrl } from '@/lib/app-identity';
+import { APP_PATH, appName, appTokens, supportUrl } from '@/lib/app-identity';
+import { payeeAddress } from '@/lib/treasury';
 
 // Required: the manifest is built from the request's own host, so it must not
 // be prerendered. The SDK cannot declare this for you — Next only reads it from

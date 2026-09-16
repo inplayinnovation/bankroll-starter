@@ -1,6 +1,7 @@
 import { getSession } from '@joinbankroll/sdk/next';
 
-import { appTokens, payeeAddress, payoutsAvailable } from '@/lib/app-identity';
+import { appTokens } from '@/lib/app-identity';
+import { payeeAddress, payoutsAvailable } from '@/lib/treasury';
 
 export async function GET(request: Request) {
   const session = await getSession(request);

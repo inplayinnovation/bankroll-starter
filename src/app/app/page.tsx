@@ -9,7 +9,8 @@ import { DevTools, type DevRow } from '@joinbankroll/sdk/react';
 import { rpcUrl, usingPublicRpc } from '@joinbankroll/sdk/server';
 
 import { BankrollBalances } from '@/components/bankroll-balances';
-import { appName, appNameConfigured, payeeAddress, payoutsAvailable } from '@/lib/app-identity';
+import { appName, appNameConfigured } from '@/lib/app-identity';
+import { payeeAddress, payoutsAvailable, serverWalletConfigured } from '@/lib/treasury';
 import { storeDirectory, usingFilesystemStore } from '@/lib/store';
 
 import { Gate } from './gate';
@@ -33,7 +34,7 @@ export default function App() {
     // Charge-only mode is a valid setup, so "off" is informational, not a fault.
     {
       label: 'Payouts',
-      value: payoutsAvailable() ? 'treasury key set' : 'off (charge-only)',
+      value: serverWalletConfigured() ? 'server wallet' : payoutsAvailable() ? 'treasury key set' : 'off (charge-only)',
       ok: true,
     },
     {

@@ -39,8 +39,11 @@ const signature = await bankroll.charge({ amountCents: 500 });
 await pay({ to: user.wallet, amountCents: 2500 });
 ```
 
-Money can also land in a wallet you hold no key for: set `BANKROLL_PAYEE` to
-its address instead of a treasury key, and the app takes payments and cannot
+An app built in Bankroll's in-app builder runs on a **server wallet** instead:
+a wallet Bankroll created for it, owned by its creator, that the app pays out
+of with its own key through Bankroll (`src/lib/treasury.ts` explains the
+variables). Money can also land in a wallet you hold no key for: set
+`BANKROLL_PAYEE` to its address alone, and the app takes payments and cannot
 pay out. And `npm run check` drives the app in a headless browser with a
 stand-in host, so a coding agent or CI can test it without a phone.
 

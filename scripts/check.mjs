@@ -5,12 +5,13 @@
 //
 //   npm run check -- /app            # one path
 //   npm run check -- /app?level=2 /  # several
-//   npm run check -- --owner /admin # as the app's owner (wallet = payee)
+//   npm run check -- --owner /admin # as the app's owner (BANKROLL_OWNER, else the payee)
 //   npm run check -- --admin-probe   # only the player probe of /api/admin
 //
 // The dev server must be running with BANKROLL_MOCK=1 (see .env.example): that
 // is what lets the server accept the stand-in host's token and signatures.
 // The host itself comes from @joinbankroll/sdk/mock.
+import { readFileSync } from 'node:fs';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -20,8 +21,9 @@ import { chromium } from 'playwright';
 
 const BASE_URL = process.env.CHECK_BASE_URL ?? 'http://localhost:3000';
 const DEFAULT_PATHS = ['/app'];
-// --owner loads pages as the app's owner: the stand-in user's wallet is the
-// payee, which is what an owner check in the app compares against.
+// --owner loads pages as the app's owner: the stand-in user's wallet is
+// BANKROLL_OWNER from .env.local when the app has a server wallet, else the
+// payee — whichever the app's owner check compares against.
 const OWNER_FLAG = '--owner';
 const OWNER_USERNAME = 'owner';
 // The admin route, if the app has one, must refuse everyone but the owner
@@ -30,6 +32,18 @@ const OWNER_USERNAME = 'owner';
 // 404 and 405 for an app with no such route or method. The builder refuses to
 // publish an app that fails this.
 const ADMIN_PROBE_FLAG = '--admin-probe';
+
+// The owner's wallet, as the dev server sees it: BANKROLL_OWNER from the
+// environment or .env.local. Empty when the app has no server wallet.
+function ownerWallet() {
+  if (process.env.BANKROLL_OWNER) return process.env.BANKROLL_OWNER;
+  try {
+    const line = readFileSync('.env.local', 'utf8').split('\n').find((l) => l.startsWith('BANKROLL_OWNER='));
+    return line ? line.slice('BANKROLL_OWNER='.length).trim().replace(/^"|"$/g, '') : '';
+  } catch {
+    return '';
+  }
+}
 const ADMIN_ROUTE = '/api/admin';
 const ADMIN_METHODS = ['POST', 'GET'];
 const ADMIN_OK_STATUSES = new Set([401, 403, 404, 405]);
@@ -104,7 +118,7 @@ async function main() {
   const manifest = await readManifest();
   const payee = manifest.capabilities?.payments;
   if (!manifest.name) problems.push('manifest: no app name (BANKROLL_APP_NAME)');
-  if (!payee) problems.push('manifest: no payee (BANKROLL_TREASURY_KEY or BANKROLL_PAYEE)');
+  if (!payee) problems.push('manifest: no payee (BANKROLL_PAYEE or BANKROLL_TREASURY_KEY)');
 
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || undefined,
@@ -115,7 +129,7 @@ async function main() {
     isMobile: true,
     hasTouch: true,
   });
-  const user = asOwner ? { wallet: payee ?? '', username: OWNER_USERNAME } : {};
+  const user = asOwner ? { wallet: ownerWallet() || payee || '', username: OWNER_USERNAME } : {};
   await context.addInitScript(mockHostScript({ payee: payee ?? '', ...user }));
 
   for (const urlPath of paths) {

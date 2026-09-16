@@ -54,10 +54,11 @@ const intentPrefix = (wallet: string) => `intents/${encodeURIComponent(wallet)}/
  *                 ↘ failed
  *
  * `paying` exists because paying a user out is not instantaneous and can fail
- * in ways that need resolving later. The transaction's signature and expiry
- * are recorded in this document *before* it is broadcast, so a charge whose
- * payout outcome was never learned is visible as `paying` — and always
- * resolvable, by asking the chain about that signature.
+ * in ways that need resolving later. The attempt — its reference, its
+ * idempotency key and its exact bytes — is recorded in this document *before*
+ * it is broadcast, so a charge whose payout outcome was never learned is
+ * visible as `paying` — and always resolvable, by the signature once stored,
+ * or by finding the reference on-chain before that.
  */
 export type ChargeStatus = 'held' | 'paying' | 'paid' | 'failed';
 
@@ -79,16 +80,21 @@ export interface Charge {
   /** Whatever the app needs to remember about what this charge was for. */
   meta?: Record<string, unknown>;
   /**
-   * Set once a payout is signed; the transfer owed for this charge. Signing
-   * is deterministic, so the signature — the transaction's on-chain id — is
-   * durable here BEFORE anything is broadcast.
+   * Set once a payout attempt is built; the transfer owed for this charge. A
+   * server wallet signs at send time, so the signature is not knowable before
+   * the broadcast — the reference is, and it is durable here BEFORE anything
+   * is sent.
    */
   payout?: {
-    /** The attempt's on-chain id, recorded before the send. */
-    signature: string;
-    /** The block height past which this attempt provably can never land. */
-    lastValidBlockHeight: number;
-    /** Last unresolved PayError code; `expired` licenses a rebuild. */
+    /** An id that existed before the send, carried on the transfer: how a landed payout is found. */
+    reference: string;
+    /** Names this attempt to the signer, which dedupes it for 24h. */
+    idempotencyKey: string;
+    /** The exact bytes built for this attempt, resent verbatim on recovery. */
+    transaction: string;
+    /** The on-chain id, known once the send is answered. */
+    signature?: string;
+    /** Last unresolved PayError code; `failed_on_chain` licenses a rebuild. */
     error?: string;
   };
 }

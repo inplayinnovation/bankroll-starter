@@ -11,7 +11,8 @@
 // flag, no "already being recovered" state.
 import { HSUSD_MINT, type ConfirmedCharge } from '@joinbankroll/sdk/server';
 
-import { appTokenMints, payeeAddress } from '@/lib/app-identity';
+import { appTokenMints } from '@/lib/app-identity';
+import { payeeAddress } from '@/lib/treasury';
 import { CATALOG, DEMO_ITEM } from '@/lib/catalog';
 import { recordCharge, type Charge } from '@/lib/store';
 
@@ -49,7 +50,7 @@ export async function settle(
   expected: { amountCents: number; item?: string } = { amountCents: PRICE_CENTS },
 ): Promise<SettleResult> {
   const payee = payeeAddress();
-  if (!payee) throw new Error('No payee — set BANKROLL_TREASURY_KEY or BANKROLL_PAYEE');
+  if (!payee) throw new Error('No payee — set BANKROLL_PAYEE (with the server wallet variables, or alone) or BANKROLL_TREASURY_KEY');
   const accepted = appTokenMints();
 
   if (charge.payee !== payee) return { ok: false, reason: 'payment went to another address' };

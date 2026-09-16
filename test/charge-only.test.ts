@@ -26,7 +26,7 @@ vi.mock('@joinbankroll/sdk/server', async (original) => {
   };
 });
 
-const { payeeAddress, payoutsAvailable } = await import('@/lib/app-identity');
+const { payeeAddress, payoutsAvailable } = await import('@/lib/treasury');
 const { settle } = await import('@/lib/charges');
 const { CATALOG, DEMO_ITEM } = await import('@/lib/catalog');
 const { POST: payOut } = await import('@/app/api/charges/[id]/payout/route');
