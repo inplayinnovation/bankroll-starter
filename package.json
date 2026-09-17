@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@joinbankroll/sdk": "^0.24.0",
+    "@joinbankroll/sdk": "^0.26.0",
     "@vercel/blob": "^2.3.0",
     "next": "^16.0.0",
     "react": "^19.0.0",
