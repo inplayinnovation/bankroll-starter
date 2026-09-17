@@ -8,7 +8,7 @@ export const viewport: Viewport = {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="app-shell mx-auto flex min-h-screen w-full max-w-md min-w-0 flex-col gap-6 overflow-x-hidden">
+    <main className="app-shell mx-auto flex h-dvh w-full max-w-md min-w-0 flex-col overflow-hidden">
       {children}
     </main>
   );

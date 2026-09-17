@@ -14,7 +14,7 @@ Home                        Results
 │       [Play]        │     │                     │
 │                     │     │                     │
 ├─────────────────────┤     ├─────────────────────┤
-│ [Home]    Results   │     │ Home    [Results]   │
+│ [Play]    Results   │     │ Play    [Results]   │
 └─────────────────────┘     └─────────────────────┘
 
 Playing                     Game result
@@ -32,7 +32,9 @@ Playing                     Game result
 **Header and tabs.** Home and Results show `?` at the top left and the Bankroll
 balance at the top right, with cash and credits combined. The `?` opens
 graphical instructions. The header does not need an app title or username.
-Footer tabs switch between **Home** and **Results**.
+Footer tabs **Play** and **Results** switch between home and history. They have
+icons with text labels and stay visible while history scrolls.
+[TabbedScreen](./src/components/tabbed-screen.tsx) supplies this layout.
 
 **Home.** Put play options above the **Play** button. These might be modes or
 dollar amounts when playing for money.

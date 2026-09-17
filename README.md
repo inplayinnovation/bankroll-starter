@@ -74,11 +74,14 @@ and deployment. The `demo` template below has a working payment flow.
 
 ## Shared app UI
 
-The `/app` shell keeps content inside the phone's safe area. The default
-[`home.tsx`](./src/app/app/home.tsx) shows the user's Bankroll balance at the
-top right. The surface owns its header, so gameplay can hide it. Replace
-this file to build your screens; [anatomy.md](./anatomy.md) describes the
-suggested layout and flow. The public site has its own layout.
+The `/app` shell fills the phone's viewport and keeps content inside its safe
+area. The default [`home.tsx`](./src/app/app/home.tsx) uses
+[`TabbedScreen`](./src/components/tabbed-screen.tsx) for a balance header and
+pinned Play/Results footer, with default icons. Tabs follow the URL; history
+scrolls within the content area. Render gameplay and individual game results
+separately to use the full frame. Replace `home.tsx` to build your screens;
+[anatomy.md](./anatomy.md) describes the suggested layout and flow. The public
+site has its own layout.
 
 [`BankrollBalances`](./src/components/bankroll-balances.tsx) reads
 [`bankroll.balances()`](https://docs.joinbankroll.com/build/balances) from the

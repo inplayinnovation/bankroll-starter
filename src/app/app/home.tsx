@@ -1,11 +1,25 @@
 import { BankrollBalances } from '@/components/bankroll-balances';
+import { TabbedScreen } from '@/components/tabbed-screen';
 
-// Build the app's surface here. It owns the header so gameplay can hide it.
-// page.tsx supplies the entry gates; layout.tsx supplies safe-area padding.
+// Build the app's surface here. Use an early return for gameplay or an
+// individual result to give that screen the frame without the header or tabs.
 export function Home() {
   return (
-    <header className="flex justify-end">
-      <BankrollBalances />
-    </header>
+    <TabbedScreen
+      header={
+        <header className="flex justify-end">
+          <BankrollBalances />
+        </header>
+      }
+      tabs={[
+        { id: 'play', label: 'Play', content: null },
+        {
+          id: 'results',
+          label: 'Results',
+          scroll: true,
+          content: <p className="text-center text-sm text-neutral-500">No results yet.</p>,
+        },
+      ]}
+    />
   );
 }

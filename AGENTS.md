@@ -35,7 +35,7 @@ real data.
 ```bash
 BANKROLL_MOCK=1 npx next dev      # or put BANKROLL_MOCK=1 in .env.local
 npm run check -- /app             # headless phone-sized Chromium, fake host
-npm run check -- /app /          # app and public site
+npm run check -- /app '/app?tab=results' / # both tabs and the public site
 npm run check -- --admin-probe    # only the player probe of /api/admin (also runs after every check)
 ```
 
@@ -95,9 +95,9 @@ Three conventions that split implies:
   so back closes them, and let deep links (an invite) win over the default
   view on load.
 
-The skeleton supplies entry gates, a verified-session endpoint, a balance
-display, and storage and treasury adapters. The surface starts with just the
-balance header.
+The skeleton supplies entry gates, a verified-session endpoint, balance and
+tabbed-screen components, and storage and treasury adapters. The surface shows
+the balance and Play/Results tabs with empty content.
 
 - `src/app/app/home.tsx` — the app's surface, including its header and
   navigation. This is the file you replace.
@@ -109,6 +109,8 @@ balance header.
   the surface.
 - `src/components/bankroll-balances.tsx` — the host balance display at the top
   right, backed by `src/lib/client/balances.ts`.
+- `src/components/tabbed-screen.tsx` — the header, content area, and pinned
+  footer navigation. `home.tsx` shows how to configure its tabs.
 - `src/app/api/me/route.ts` — claims from the verified session, plus app
   configuration. `useMe()` in `src/lib/client/bankroll.ts` reads them.
 - `src/lib/store.ts` — the store backend this app writes documents to; see
@@ -133,14 +135,23 @@ route from `/next`; the treasury, charge confirmation, and payouts from
 `viewportFit: 'cover'`; `.app-shell` in `src/app/globals.css` uses
 `env(safe-area-inset-*)` to keep content clear of the notch, status bar, and
 home indicator. Padding is the larger of the device inset and the normal
-spacing (2.5rem vertically, 1.25rem horizontally). Keep the header and surface
-inside that shell without adding a second inset. A phone-sized browser viewport
+spacing (2.5rem top, 0.75rem bottom, 1.25rem horizontally). Keep the header and
+surface inside that shell without adding a second inset. A phone-sized browser viewport
 alone does not simulate a notch; check on a device or override the browser's
 safe-area insets when checking layout.
 
 **The surface owns its header.** `home.tsx` renders `BankrollBalances` at the
 top right inside `Gate`. Keeping the header with the surface lets gameplay
 hide it. Reuse `BankrollBalances` for its host reads and formatting.
+
+**Keep footer tabs outside scrolling content.** The app shell fills the dynamic
+viewport height. `TabbedScreen` reserves space for its header and footer and
+gives the remaining height to the selected tab. Set `scroll: true` for history;
+the footer stays visible. The first tab is the default, `?tab=<id>` selects
+another, and switching uses `replaceState` while preserving other query params.
+The `play` and `results` tab IDs have default icons; `icon` supplies a custom one.
+Render gameplay and individual game results outside `TabbedScreen`; let their
+deep links take precedence when choosing the surface.
 
 **Host balances are for display only.** `useBalances()` calls
 [`bankroll.balances()`](https://docs.joinbankroll.com/build/balances) on mount,
