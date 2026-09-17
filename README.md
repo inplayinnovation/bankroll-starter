@@ -1,6 +1,6 @@
 # Bankroll Starter
 
-A real-money app, running on your phone, in three commands.
+A Bankroll app skeleton, running on your phone, in three commands.
 
 ```bash
 npm create @joinbankroll/app@latest my-app
@@ -8,7 +8,7 @@ cd my-app
 npm run dev
 ```
 
-`npm run dev` prints a QR. Scan it: your app opens inside Bankroll, ready to take payments and pay them back out, hot reload included.
+`npm run dev` prints a QR. Scan it: your app opens inside Bankroll, with hot reload.
 
 No account. No signup. No API key. Nothing to register.
 
@@ -27,16 +27,12 @@ the whole setup, from an empty folder to the QR on your phone.
 All three arrive with the user. You write the product.
 
 ```ts
+import { requireSession } from '@joinbankroll/sdk/next';
+
 // Who you're dealing with, from a signed token rather than the client.
 const { user, geo } = await requireSession(request);
 user.identity; // a verified person — { age } when a date of birth is on file
 geo;           // "US-NY" — where they are right now
-
-// Charge them. They approve it in Bankroll.
-const signature = await bankroll.charge({ amountCents: 500 });
-
-// Pay them.
-await pay({ to: user.wallet, amountCents: 2500 });
 ```
 
 An app built in Bankroll's in-app builder runs on a **server wallet** instead:
@@ -66,26 +62,31 @@ Everything that is not your app comes from [`@joinbankroll/sdk`](https://www.npm
 
 ## Make it yours
 
-What ships is a skeleton, not a product: the session Bankroll signs — wallet, identity, location, age — can be verified on your server, the money path is wired, and the surface is empty. Build rounds of golf, contest entries, tips, loot boxes — whatever you're making. Open the project in Claude Code, Cursor, or Codex and ask:
+The skeleton includes the manifest, entry gates, a verified-session endpoint,
+a balance component, and storage and treasury adapters. Build your screens,
+state, and payment flows on top of those pieces. Open the project in Claude
+Code, Cursor, or Codex and ask:
 
 > Set up this Bankroll app so it can take payments.
 
-[`AGENTS.md`](./AGENTS.md) has what your agent needs: the routes, the rules money code has to follow, and how to deploy it.
+[`AGENTS.md`](./AGENTS.md) covers the project structure, development checks,
+and deployment. The `demo` template below has a working payment flow.
 
 ## Shared app UI
 
-The `/app` shell keeps content inside the phone's safe area. Its header shows
-the user's Bankroll balance at the top right. Replace
-[`home.tsx`](./src/app/app/home.tsx) to build your surface; the header stays.
-The public site has its own layout.
+The `/app` shell keeps content inside the phone's safe area. The default
+[`home.tsx`](./src/app/app/home.tsx) shows the user's Bankroll balance at the
+top right. The surface owns its header, so gameplay can hide it. Replace
+this file to build your screens; [anatomy.md](./anatomy.md) describes the
+suggested layout and flow. The public site has its own layout.
 
 [`BankrollBalances`](./src/components/bankroll-balances.tsx) reads
 [`bankroll.balances()`](https://docs.joinbankroll.com/build/balances) from the
 host and refreshes while the app is visible. Cash and app credits form one
 Bankroll dollar balance; declared tokens have their own named balances.
-This is a display, never an authorization check; charges and payouts still use
-the server's money path. A host without this prerelease capability shows an
-update hint without blocking the app.
+This is a display, never an authorization check. Payment decisions belong on
+the server. A host without this prerelease capability shows an update hint
+without blocking the app.
 
 ## Templates
 
@@ -96,8 +97,8 @@ branch is a reference app built on it. Scaffold one with:
 npm create @joinbankroll/app@latest my-app -- --template demo
 ```
 
-- [`demo`](../../tree/demo) — the money loop on one screen: the signed
-  session's claims.
+- [`demo`](../../tree/demo) — the verified session, a one-cent charge, and
+  paying the same cent back on one screen.
 
 ## Links
 

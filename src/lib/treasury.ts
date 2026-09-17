@@ -34,8 +34,8 @@ export const payeeAddress = (): string | null =>
   serverWalletConfigured() ? process.env.BANKROLL_PAYEE || null : treasuryAddress();
 
 /**
- * The owner: the person the admin screen belongs to. The server wallet's
- * owner for shape 1; the keypair's own address for shape 2.
+ * The owner, for owner-only features: the server wallet's owner for shape 1;
+ * the keypair's own address for shape 2.
  */
 export const ownerAddress = (): string | null => process.env.BANKROLL_OWNER || treasuryAddress();
 

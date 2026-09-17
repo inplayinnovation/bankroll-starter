@@ -1,9 +1,8 @@
 # Bankroll Starter
 
-Next.js 16 (App Router) + React 19 + TypeScript + Tailwind v4. A real-money app
-for the Bankroll platform: it sells things and pays users out. It is **not** a
-wallet — the Bankroll host holds the money, identity, and location; this app
-takes payments and remembers what was bought.
+Next.js 16 (App Router) + React 19 + TypeScript + Tailwind v4. A skeleton for
+Bankroll apps. The host holds the player's wallet and provides identity and
+location. Build your screens, state, and payment flows here.
 
 Platform docs: https://docs.joinbankroll.com/llms-full.txt
 
@@ -36,8 +35,7 @@ real data.
 ```bash
 BANKROLL_MOCK=1 npx next dev      # or put BANKROLL_MOCK=1 in .env.local
 npm run check -- /app             # headless phone-sized Chromium, fake host
-npm run check -- /app?tab=history /
-npm run check -- --owner /admin   # the same, signed in as the app's owner
+npm run check -- /app /          # app and public site
 npm run check -- --admin-probe    # only the player probe of /api/admin (also runs after every check)
 ```
 
@@ -47,6 +45,8 @@ with a verified identity, and `charge()` completes with a made-up signature the
 server accepts. It fails on any console error, page error, or failed request,
 and writes screenshots to `checks/`. Look at them. Real money moves only inside
 the Bankroll app; the flag is ignored in production builds.
+
+Pass `--owner` to test screens you add for the app's owner.
 
 ## Setup (local)
 
@@ -95,23 +95,25 @@ Three conventions that split implies:
   so back closes them, and let deep links (an invite) win over the default
   view on load.
 
-What ships is a skeleton rather than a product: the entry gates, the verified
-session, the shared app header, and the money path in `src/lib`, with an
-empty surface. Replacing the surface with the thing you're actually
-selling is expected — the money-path rules below are what carries over.
+The skeleton supplies entry gates, a verified-session endpoint, a balance
+display, and storage and treasury adapters. The surface starts with just the
+balance header.
 
-- `src/app/app/home.tsx` — the app's surface, and the file you replace. It is
-  not a wallet: the host is.
+- `src/app/app/home.tsx` — the app's surface, including its header and
+  navigation. This is the file you replace.
 - `src/app/app/layout.tsx` — the phone shell and its viewport configuration.
   The root layout stays bare; the public site supplies its own frame.
 - `src/app/app/gate.tsx` — the entry gates: hydration, configuration, host
   status. Every surface renders inside them; `page.tsx` stays a thin shell
-  that wires the shared header and surface together. Leave both alone when
-  replacing the surface.
+  that renders the surface inside those gates. Leave both alone when replacing
+  the surface.
 - `src/components/bankroll-balances.tsx` — the host balance display at the top
   right, backed by `src/lib/client/balances.ts`.
+- `src/app/api/me/route.ts` — claims from the verified session, plus app
+  configuration. `useMe()` in `src/lib/client/bankroll.ts` reads them.
 - `src/lib/store.ts` — the store backend this app writes documents to; see
   Storage.
+- `src/lib/treasury.ts` — the payee, owner, and payout signer configuration.
 - `src/lib/app-identity.ts` — how the app introduces itself in the manifest:
   its name, where it boots, the tokens it issues, and `BANKROLL_SUPPORT_URL`,
   which puts a "Help with <app>" item in Bankroll's own menu. Any URL works —
@@ -136,11 +138,9 @@ inside that shell without adding a second inset. A phone-sized browser viewport
 alone does not simulate a notch; check on a device or override the browser's
 safe-area insets when checking layout.
 
-**The shared header shows Bankroll balances at the top right.** `page.tsx`
-renders it inside `Gate`, above `Home`, so replacing the surface preserves it.
-It supplies only the balance display; the surface owns its branding and game
-controls. Reuse `BankrollBalances` rather than reading or formatting balances
-in each surface.
+**The surface owns its header.** `home.tsx` renders `BankrollBalances` at the
+top right inside `Gate`. Keeping the header with the surface lets gameplay
+hide it. Reuse `BankrollBalances` for its host reads and formatting.
 
 **Host balances are for display only.** `useBalances()` calls
 [`bankroll.balances()`](https://docs.joinbankroll.com/build/balances) on mount,
@@ -161,30 +161,13 @@ display; settled charges and server records remain authoritative.
 
 ## Storage
 
-`src/lib/store.ts` — this app's Charge model. The backends behind it are
-`@joinbankroll/sdk/store/fs` and `/store/vercel`: local files in development,
-Vercel Blob when deployed, chosen by `STORE`. Nothing above the interface knows
-which is live, so the same code deploys unchanged.
+`src/lib/store.ts` selects the SDK backend: `@joinbankroll/sdk/store/fs` when
+`STORE=fs`, otherwise `/store/vercel`. `storeBackend()` exposes that backend.
+Define document shapes and keys alongside the app's domain logic.
 
-- `createIfAbsent()` — atomic create that fails if the path exists (rule 3's guard)
-- `writeJson(..., ifMatch)` — compare-and-swap, throws `PreconditionFailed` on a
-  lost race (rule 4's transitions)
-- `list(prefix, { limit, cursor })` — a page in ascending key order; charges key
-  the slot first so a listing is newest-first without a post-sort
-- Blob reads pass `useCache: false`, or they can be 60s stale
-
-One document per charge at `charges/<wallet>/<invertedSlot>-<signature>.json` —
-no aggregate to keep in sync, which is what makes it safe on a store with no
-transactions. Outgrow it → replace `store/` with Postgres; don't add query
-capability the object store can't back (filter with your own index).
-
-Alongside it, one per attempt at
-`intents/<wallet>/<invertedStartedAt>-<reference>.json` (rule 5). Not
-authoritative — the charge document is, and it is still keyed by the transaction
-— so an intent is only a note to go and look. Nested under the wallet on purpose:
-listing one level below a prefix behaves the same on both backends, while a
-listing across *all* wallets does not (Blob's is recursive, the filesystem's is
-one directory deep), so a global reconcile is deployment-only work.
+The SDK supplies atomic creates, compare-and-swap writes, and paginated
+listing. Keep each state transition within one document; the store has no
+transactions across documents.
 
 ## Deploy
 
