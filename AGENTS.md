@@ -1,8 +1,9 @@
 # Bankroll Starter
 
-Next.js 16 (App Router) + React 19 + TypeScript + Tailwind v4. A skeleton for
-Bankroll apps. The host holds the player's wallet and provides identity and
-location. Build your screens, state, and payment flows here.
+Next.js 16 (App Router) + React 19 + TypeScript + Tailwind v4. Word Hunt is a
+free-to-play reference app: find words on a seeded 4×4 board in 60 seconds.
+The host holds the player's wallet and provides identity and location.
+The game uses the verified session and storage; it never charges or pays out.
 
 Platform docs: https://docs.joinbankroll.com/llms-full.txt
 
@@ -21,7 +22,7 @@ npm run typecheck      # tsc --noEmit
 npm run lint           # eslint
 ```
 
-Run `npm run typecheck && npm run lint` before finishing any change.
+Run `npm run typecheck && npm run lint && npm test` before finishing any change.
 
 `STORE=blob npm test` runs the same suite against Vercel Blob rather than local
 files, using `DANGEROUS_BLOB_TOKEN` from `.env.test.local`. The store backends
@@ -95,12 +96,22 @@ Three conventions that split implies:
   so back closes them, and let deep links (an invite) win over the default
   view on load.
 
-The skeleton supplies entry gates, a verified-session endpoint, balance and
-tabbed-screen components, and storage and treasury adapters. The surface shows
-the balance and Play/Results tabs with empty content.
+The app supplies entry gates, a verified-session endpoint, balance and
+tabbed-screen components, storage and treasury adapters, and the Word Hunt
+game. The treasury adapter is present but unused by gameplay.
 
 - `src/app/app/home.tsx` — the app's surface, including its header and
-  navigation. This is the file you replace.
+  URL navigation, Play CTA, and Play/Results tabs.
+- `src/app/app/game-screen.tsx` — gameplay and the individual round result.
+  `letter-board.tsx` handles tile selection; `results.tsx` renders history;
+  `how-to-play.tsx` is the graphical help dialog.
+- `src/lib/games.ts` — game documents, deadlines, submission replay, and atomic
+  state transitions. `word-hunt.ts` holds shared rules and response types;
+  `word-hunt-board.ts` deals boards; `word-hunt-dictionary.ts` validates words.
+- `src/app/api/games/` — prepare, start, read, submit a path, finish, and list.
+  `src/lib/game-route.ts` establishes verified wallet scope for every route.
+- `src/lib/client/games.ts` — authenticated requests, exact submission retries,
+  and the display clock. It never computes an authoritative score.
 - `src/app/app/layout.tsx` — the phone shell and its viewport configuration.
   The root layout stays bare; the public site supplies its own frame.
 - `src/app/app/gate.tsx` — the entry gates: hydration, configuration, host
@@ -179,6 +190,42 @@ Define document shapes and keys alongside the app's domain logic.
 The SDK supplies atomic creates, compare-and-swap writes, and paginated
 listing. Keep each state transition within one document; the store has no
 transactions across documents.
+
+## Game invariants
+
+- **The session owns the round.** Every game route calls `requireSession` and
+  uses its wallet for `games/<wallet>/<id>.json`. Free play adds no identity
+  verification gate. No body can choose a wallet, seed, deadline, or score.
+- **One round, one document.** The server mints a seed and a newest-first
+  `sortableId`. The document contains its board, clock, accepted words, score,
+  and last submission. Each transition uses compare-and-swap on that document.
+  Recheck the clock and sequence after a lost race.
+- **Prepare before starting.** A prepared round hides its board. The client
+  puts its ID in `?game=<id>` before starting it. Start is idempotent, so a lost
+  response or reload cannot reset the deadline. A lost preparation response
+  can leave an unstarted round in history; no time or value is consumed.
+- **Submit paths, never scores.** The server checks tile indices, adjacency
+  (including diagonals), no tile reuse, dictionary membership, and uniqueness.
+  Words need three letters; Qu is one tile and two letters. Lengths 3–4, 5, 6,
+  7, and 8+ score 1, 2, 3, 5, and 11 points respectively.
+- **Retries are already satisfied.** Submissions use `submissions + 1`.
+  An old sequence returns current state; a skipped sequence returns 409.
+  A valid path that spells an invalid or repeated word consumes its sequence
+  without scoring. Malformed paths return 400 without consuming one.
+- **Only server time ends play.** The countdown is a display anchored to the
+  response's server time. Expiry is finalized on the next read or action,
+  including history reads after an app was closed. No background job is needed.
+- **Rules stay reproducible.** The document stores the board and rules version.
+  The word-list dependency is pinned and imported only by server modules.
+  Reads and history accept only the supported version; other documents remain
+  untouched rather than being treated as current rounds.
+  Treat dictionary, generator, and scoring changes as rule changes; preserve
+  handling for existing rounds when introducing another version.
+
+`test/games.test.ts` covers lifecycle, concurrency, deadlines, replay, wallet
+scope, and pagination against the selected store. `test/word-hunt.test.ts`
+covers board generation and path rules. Do not replace these with tests that
+only mock storage writes.
 
 ## Deploy
 

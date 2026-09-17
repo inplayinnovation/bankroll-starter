@@ -1,110 +1,76 @@
-# Bankroll Starter
+# Word Hunt — free play
 
-A Bankroll app skeleton, running on your phone, in three commands.
+A Bankroll reference app: find words on a seeded 4×4 board in 60 seconds.
+The server owns the round and score. No payments or payouts occur.
 
 ```bash
-npm create @joinbankroll/app@latest my-app
-cd my-app
+npm install
 npm run dev
 ```
 
-`npm run dev` prints a QR. Scan it: your app opens inside Bankroll, with hot reload.
+The dev command prints a QR that opens the app inside Bankroll, with hot reload.
+See [AGENTS.md](./AGENTS.md) for setup, testing, and deployment.
 
-No account. No signup. No API key. Nothing to register.
+## Read the implementation
 
-Building with a coding agent? Start at
-[Build with an agent](https://docs.joinbankroll.com/build/agents) — it walks
-the whole setup, from an empty folder to the QR on your phone.
+| File | What it demonstrates |
+| --- | --- |
+| [home.tsx](./src/app/app/home.tsx) | Home, Play/Results tabs, help, and game deep links |
+| [game-screen.tsx](./src/app/app/game-screen.tsx) | A game that fits its frame and opens its result when finished |
+| [games.ts](./src/lib/games.ts) | One document per round, compare-and-swap, replay, and server deadlines |
+| [game routes](./src/app/api/games/route.ts) | Wallet scope from the verified session |
+| [client/games.ts](./src/lib/client/games.ts) | Recovering a round and retrying the same submission |
+| [word-hunt.ts](./src/lib/word-hunt.ts) | Path validation, scoring rules, and response types |
+| [games.test.ts](./test/games.test.ts) | Races, expiry, replay, ownership, and history pagination |
 
-## The hard parts are already done
+The shared layout conventions are in [anatomy.md](./anatomy.md). Home has the
+balance, help, a play option, and a Play CTA. Gameplay and the individual result
+use the full frame. Results history scrolls above the pinned footer tabs.
 
-**Payments.** Stablecoin transfers that settle on-chain and are final. No processor, no merchant account, no chargebacks, no payout rail to build.
+## Round lifecycle
 
-**Identity.** Every user is a verified real person, and one person verifies exactly one identity. Multi-accounting doesn't work.
+`ready → playing → finished`
 
-**Location.** Where the user is for this session, so you can decide where you operate.
+Play prepares a round, saves its ID in the URL, and starts it. The server mints
+the seed, keeps the board hidden until start, and fixes the deadline. Reloading
+or retrying a start keeps that deadline. Both finishing early and expiring are
+terminal transitions.
 
-All three arrive with the user. You write the product.
+Each submission contains only a sequence and tile path. The server derives the
+word, validates it, and records any points in the same document as the sequence.
+Duplicate requests return current state. Neither score nor elapsed time comes
+from the client. Expired rounds finish on their next read or action, including
+when opening history after closing the app.
 
-```ts
-import { requireSession } from '@joinbankroll/sdk/next';
+The English dictionary is the pinned
+[`an-array-of-english-words`](https://github.com/words/an-array-of-english-words)
+package (MIT, derived from the Letterpress word list). It stays on the server.
+The generator, scoring, and dictionary form rules version 1.
 
-// Who you're dealing with, from a signed token rather than the client.
-const { user, geo } = await requireSession(request);
-user.identity; // a verified person — { age } when a date of birth is on file
-geo;           // "US-NY" — where they are right now
-```
+This validates legal play and scores. It does not detect a solver or someone
+automating legal submissions.
 
-An app built in Bankroll's in-app builder runs on a **server wallet** instead:
-a wallet Bankroll created for it, owned by its creator, that the app pays out
-of with its own key through Bankroll (`src/lib/treasury.ts` explains the
-variables). And `npm run check` drives the app in a headless browser with a
-stand-in host, so a coding agent or CI can test it without a phone.
-
-It moves real mainnet HSUSD. `npm run dev` creates a signing key at `~/.config/bankroll/keypair.json` on first use and hands it to the dev server — it is never written into your project, so it cannot be committed. That key receives payments and signs payouts, so fund it with only what you want to risk, and give a deployment its own.
-
-## Commands
+## Check it
 
 ```bash
-npm run dev                                     # tunnel + QR — the loop you're in
-npx bankroll treasury                           # the wallet this app runs on
-npx bankroll token create --name "Promo Credit" # a token of your own
-npx bankroll --help                             # everything else
+npm run typecheck && npm run lint && npm test
+# With BANKROLL_MOCK=1 on the dev server:
+npm run check -- /app '/app?tab=results' '/app?help=1'
 ```
 
-`npm run dev` is `bankroll dev`, because the app only runs inside Bankroll — a
-plain localhost server is the exception, not the loop, and it is `npx next dev`
-when you want it.
-
-`npx bankroll token create --name "Promo Credit"` mints your own token: play money that spends in your app and nowhere else, so you can exercise the whole money loop without spending real money. It lands in [`app-tokens.json`](./app-tokens.json), which is the `appTokens` claim your manifest serves.
-
-Everything that is not your app comes from [`@joinbankroll/sdk`](https://www.npmjs.com/package/@joinbankroll/sdk) and [`@joinbankroll/cli`](https://www.npmjs.com/package/@joinbankroll/cli), so it updates with `npm update` rather than a merge.
-
-## Make it yours
-
-The skeleton includes the manifest, entry gates, a verified-session endpoint,
-a balance component, and storage and treasury adapters. Build your screens,
-state, and payment flows on top of those pieces. Open the project in Claude
-Code, Cursor, or Codex and ask:
-
-> Set up this Bankroll app so it can take payments.
-
-[`AGENTS.md`](./AGENTS.md) covers the project structure, development checks,
-and deployment. The `demo` template below has a working payment flow.
-
-## Shared app UI
-
-The `/app` shell fills the phone's viewport and keeps content inside its safe
-area. The default [`home.tsx`](./src/app/app/home.tsx) uses
-[`TabbedScreen`](./src/components/tabbed-screen.tsx) for a balance header and
-pinned Play/Results footer, with default icons. Tabs follow the URL; history
-scrolls within the content area. Render gameplay and individual game results
-separately to use the full frame. Replace `home.tsx` to build your screens;
-[anatomy.md](./anatomy.md) describes the suggested layout and flow. The public
-site has its own layout.
-
-[`BankrollBalances`](./src/components/bankroll-balances.tsx) reads
-[`bankroll.balances()`](https://docs.joinbankroll.com/build/balances) from the
-host and refreshes while the app is visible. Cash and app credits form one
-Bankroll dollar balance; declared tokens have their own named balances.
-This is a display, never an authorization check. Payment decisions belong on
-the server. A host without this prerelease capability shows an update hint
-without blocking the app.
+The test suite uses isolated storage. `STORE=blob npm test` uses the throwaway
+Blob credentials described in AGENTS.md. Do not run a second Next dev server
+when a tunnel server is already running for this project.
 
 ## Templates
 
-Every branch of this repo is a template — `main` is the skeleton, and each
-branch is a reference app built on it. Scaffold one with:
+- `main` — the app skeleton: entry gates, verified session, shared UI, and adapters.
+- `f2p` — this free Word Hunt reference game.
+
+Published templates can be scaffolded with:
 
 ```bash
-npm create @joinbankroll/app@latest my-app -- --template demo
+npm create @joinbankroll/app@latest my-app -- --template f2p
 ```
-
-- [`demo`](../../tree/demo) — the verified session, a one-cent charge, and
-  paying the same cent back on one screen.
-
-## Links
-
-[Docs](https://docs.joinbankroll.com/build/overview) · [Quickstart](https://docs.joinbankroll.com/build/quickstart) · [Payments](https://docs.joinbankroll.com/build/payments) · [Payouts](https://docs.joinbankroll.com/build/payouts) · [SDK](https://www.npmjs.com/package/@joinbankroll/sdk) · [CLI](https://www.npmjs.com/package/@joinbankroll/cli)
 
 MIT — see [LICENSE](./LICENSE).
