@@ -49,6 +49,38 @@ function refresh<Game, Conditions extends Json>(
     : round;
 }
 
+// A round that owes money right now: a refund on a cancelled paid entry, or a
+// matched round whose play is over. The worker settles it; scheduleSettlement
+// below asks for that in the background of this request instead of waiting
+// for the hourly schedule.
+function owing<Game, Conditions extends Json>(
+  ctx: Context<Game, Conditions>,
+  round: Round<Game, Conditions>,
+): boolean {
+  const entry = round.entry;
+  if (!entry) return false;
+  if (entry.status === 'cancelled') return Boolean(entry.payment.signature) && round.payout?.status !== 'paid';
+  return entry.ticket?.state === 'matched' && finalRound(ctx, round as PaidRound<Game, Conditions>) !== null;
+}
+
+// Whether the opponent may have forfeited by now: the one settle-able state a
+// round can enter without anyone writing to it.
+function deadlinePassed<Game, Conditions extends Json>(round: Round<Game, Conditions>): boolean {
+  const entry = round.entry;
+  if (entry?.ticket?.state !== 'matched') return false;
+  return Date.now() >= entry.ticket.match.matchedAt + entry.terms.startWindowMs;
+}
+
+function scheduleSettlement<Game, Conditions extends Json>(
+  ctx: Context<Game, Conditions>,
+  before: Round<Game, Conditions>,
+  after: Round<Game, Conditions>,
+) {
+  if (!ctx.settleLater || !after.entry?.origin || !owing(ctx, after)) return;
+  if (owing(ctx, before) && !deadlinePassed(after)) return;
+  ctx.settleLater(after.wallet, after.id, after.entry.origin);
+}
+
 /** Both sections, clock expiry, and replay checks compete on this one key. */
 export async function changeRound<Game, Conditions extends Json>(
   ctx: Context<Game, Conditions>,
@@ -77,9 +109,13 @@ export async function changeRound<Game, Conditions extends Json>(
       next.schema !== 1
     )
       throw new GameError('invalid_round', 409);
-    if (next === stored.value) return next;
+    if (next === stored.value) {
+      scheduleSettlement(ctx, stored.value, next);
+      return next;
+    }
     try {
       await ctx.store.writeJson(path, next, stored.etag);
+      scheduleSettlement(ctx, stored.value, next);
       return next;
     } catch (error) {
       if (!(error instanceof PreconditionFailed)) throw error;

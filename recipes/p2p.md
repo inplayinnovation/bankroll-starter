@@ -30,13 +30,17 @@ live beside the implementation.
    conditions on the round. Bob enters the same queue and both receive the same
    accepted conditions, including the seed. Inside a round CAS, `startEntry`
    closes cancellation while the game initializes and reveals play state.
-4. Once both rounds are terminal, the scheduled worker takes over: within a
-   minute, `worker.runReconciliation` visits the round, `worker.resolveMatch`
-   atomically creates `matches/<match-id>.json` (if Alice wins: Alice $1.80,
-   Bob $0, the distinct creator $0.20, with `duel:<id>`), and
-   `worker.reconcileEntry` advances that document's SDK payout, all lines in
-   one transaction. A request handler never calls the worker: a player's page
-   load shows stored results and moves no money. A normal treasury retains its $0.20 instead of sending to itself.
+4. The request that ends the second round returns at once, and settlement
+   runs in its background: the mode hands `worker.reconcileEntry` to the
+   binding's `after` (Next's `after` from `next/server`), which runs once the
+   response is sent. `worker.resolveMatch` atomically creates
+   `matches/<match-id>.json` (if Alice wins: Alice $1.80, Bob $0, the distinct
+   creator $0.20, with `duel:<id>`) and the SDK payout goes out, all lines in
+   one transaction; the result screen's next poll shows it paid, seconds
+   later. The mode schedules that on transitions that leave money owed, and
+   on a read once the opponent's start deadline has passed; a plain poll of
+   a settled round schedules nothing. A request handler never calls the
+   worker itself. The hourly cron is the backstop for whoever was not there. A normal treasury retains its $0.20 instead of sending to itself.
    A tie returns $1 each, with a zero creator line when its wallet is distinct.
 5. If nobody joins while Alice waits and she has **not started**,
    `cancelEntry` obtains an SDK cancellation and records a $1 refund on her
@@ -72,6 +76,7 @@ before designing the round: the server only knows when a request arrived.
 Bind the game once, in a server module of its own:
 
 ```ts
+import { after } from 'next/server';
 import { HSUSD_MINT } from '@joinbankroll/sdk/server';
 import { createP2P } from '@/lib/p2p';
 import { storeBackend } from '@/lib/store';
@@ -82,6 +87,8 @@ export const p2p = createP2P({
   hooks,
   store: storeBackend(),
   signer: payoutSigner,
+  // Settles in the background of the request that left money owed.
+  after,
   paymentTerms: () => {
     const payee = payeeAddress() ?? '';
     return {
@@ -123,10 +130,12 @@ STORE=fs npm test
 
 Main's pages show the skeleton; the worked example adds gameplay. With a bound
 game, the SDK mock adds a stand-in opponent after three seconds; it never plays
-and forfeits at the start deadline. Reconciliation completes mock payouts
-without moving money; payout building still needs an RPC blockhash.
+and forfeits at the start deadline. Under the mock the whole payout path runs
+without an RPC: a mock signer's payout is built, sent and confirmed with
+made-up values and no money moves.
 [test/p2p.test.ts](../test/p2p.test.ts) is the smallest working game and money-flow
-example. `vercel.json` schedules the authenticated endpoint every minute.
+example. `vercel.json` schedules the authenticated endpoint hourly, as the
+backstop behind background settlement.
 
 ## Combining
 

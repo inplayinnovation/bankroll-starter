@@ -57,7 +57,13 @@ let now: number;
 let payee: string;
 let creatorWallet: string;
 let mode: ReturnType<typeof makeMode>;
-function makeMode(policy = {}) {
+// What a binding's `after` receives: recorded here, run when a test says so.
+const scheduled: (() => Promise<unknown>)[] = [];
+const flush = async () => {
+  const work = scheduled.splice(0);
+  await Promise.all(work.map((run) => run()));
+};
+function makeMode(policy = {}, withAfter = false) {
   return createP2P({
     hooks,
     policy,
@@ -66,6 +72,7 @@ function makeMode(policy = {}) {
       throw new Error('The mocked SDK helper must own signing');
     },
     paymentTerms: () => ({ payee, creatorWallet, mint: HSUSD_MINT }),
+    ...(withAfter ? { after: (work: () => Promise<unknown>) => void scheduled.push(work) } : {}),
   });
 }
 
@@ -86,6 +93,7 @@ beforeEach(() => {
   vi.spyOn(Date, 'now').mockImplementation(() => now);
   payee = `card-treasury-${randomUUID()}`;
   creatorWallet = `card-creator-${randomUUID()}`;
+  scheduled.length = 0;
   mode = makeMode();
   vi.mocked(claimCharge).mockImplementation(async ({ signature, expected }) =>
     signature
@@ -211,5 +219,58 @@ describe('P2P with a second game', () => {
     expect((await mode.readEntry(b.wallet, b.id)).entry.status).toBe('forfeited');
     expect(result.outcome).toEqual({ kind: 'forfeit', winner: a.id });
     expect(result.payout.recipients.map((line) => line.amountCents)).toEqual([380, 0, 20]);
+  });
+
+  it('settles in the background of the request that ended the round, and the worker never re-kicks', async () => {
+    mode = makeMode({}, true);
+    const a = await enter(42);
+    const b = await enter(999);
+    await mode.syncEntry(a.wallet, a.id, origin);
+    expect(scheduled).toHaveLength(0);
+    await play(a, 9);
+    // The first finish schedules a look; the match cannot be resolved yet, so it pays nothing.
+    expect(scheduled).toHaveLength(1);
+    await flush();
+    expect(settlePayout).not.toHaveBeenCalled();
+    await play(b, 4);
+    // The second finish leaves both rounds terminal: its settlement pays.
+    expect(scheduled).toHaveLength(1);
+    await flush();
+    expect(settlePayout).toHaveBeenCalledTimes(1);
+    const current = await mode.readEntry(b.wallet, b.id);
+    if (current.entry.ticket?.state !== 'matched') throw new Error('Expected match');
+    const path = matchPath(current.entry.ticket.match.id);
+    paths.add(path);
+    expect((await store.readJson<MatchResult<CardGame>>(path))!.value.payout.status).toBe('paid');
+    // Settling ran on the worker's side of the binding: it scheduled nothing more.
+    expect(scheduled).toHaveLength(0);
+    // A plain read afterwards, before any deadline, schedules nothing either.
+    await mode.readEntry(a.wallet, a.id);
+    expect(scheduled).toHaveLength(0);
+  });
+
+  it('schedules a settlement when a read finds the opponent past the start deadline', async () => {
+    mode = makeMode({}, true);
+    const a = await enter(42);
+    await enter(999);
+    await mode.syncEntry(a.wallet, a.id, origin);
+    await play(a, 9);
+    await flush();
+    expect(settlePayout).not.toHaveBeenCalled();
+    // Nothing changed on this round, so a read schedules nothing until the deadline.
+    await mode.readEntry(a.wallet, a.id);
+    expect(scheduled).toHaveLength(0);
+    now += 300_000;
+    await mode.readEntry(a.wallet, a.id);
+    expect(scheduled).toHaveLength(1);
+    await flush();
+    expect((await mode.readEntry(a.wallet, a.id)).entry.ticket?.state).toBe('matched');
+    const current = await mode.readEntry(a.wallet, a.id);
+    if (current.entry.ticket?.state !== 'matched') throw new Error('Expected match');
+    const path = matchPath(current.entry.ticket.match.id);
+    paths.add(path);
+    const result = (await store.readJson<MatchResult<CardGame>>(path))!.value;
+    expect(result.outcome).toEqual({ kind: 'forfeit', winner: a.id });
+    expect(result.payout.status).toBe('paid');
   });
 });

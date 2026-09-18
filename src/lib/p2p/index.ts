@@ -19,11 +19,30 @@ import { runReconciliation } from './worker';
  * it. A player request never executes a payout.
  */
 export function createP2P<G, C extends Json>(
-  options: Omit<Context<G, C>, 'policy'> & { policy?: Partial<Policy> },
+  options: Omit<Context<G, C>, 'policy' | 'settleLater'> & { policy?: Partial<Policy> },
 ) {
-  const ctx: Context<G, C> = { ...options, policy: { ...DEFAULT_POLICY, ...options.policy } };
+  // The worker runs without the kick, so settling a round never schedules
+  // another settlement of it: the player side is the only side that kicks.
+  const worker: Context<G, C> = {
+    ...options,
+    policy: { ...DEFAULT_POLICY, ...options.policy },
+    settleLater: undefined,
+  };
   const reconcile = (wallet: string, id: string, origin: string) =>
-    reconcileEntry(ctx, wallet, id, origin);
+    reconcileEntry(worker, wallet, id, origin);
+  const { after } = options;
+  const ctx: Context<G, C> = {
+    ...worker,
+    settleLater: after
+      ? (wallet, id, origin) =>
+          after(() =>
+            reconcile(wallet, id, origin).catch((error: unknown) => {
+              // The scheduled worker takes the round on its next pass.
+              console.error(`p2p: background settlement of ${id} failed; the worker retries it`, error);
+            }),
+          )
+      : undefined,
+  };
   return {
     readRound: (wallet: string, id: string) => entries.readRound(ctx, wallet, id),
     changeRound: (wallet: string, id: string, change: (round: Round<G, C>) => Round<G, C>) =>
@@ -48,9 +67,9 @@ export function createP2P<G, C extends Json>(
     cancelEntry: (wallet: string, id: string, origin: string) =>
       matching.cancelEntry(ctx, wallet, id, origin),
     worker: {
-      runReconciliation: (origin: string) => runReconciliation(ctx.store, reconcile, origin),
+      runReconciliation: (origin: string) => runReconciliation(worker.store, reconcile, origin),
       reconcileEntry: reconcile,
-      resolveMatch: (round: PaidRound<G, C>) => resolveMatch(ctx, round),
+      resolveMatch: (round: PaidRound<G, C>) => resolveMatch(worker, round),
     },
   };
 }

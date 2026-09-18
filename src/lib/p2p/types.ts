@@ -81,6 +81,15 @@ export interface Context<Game, Conditions extends Json> extends SettlePayoutOpti
   hooks: GameHooks<Game, Conditions>;
   policy: Policy;
   paymentTerms(): PaymentTerms;
+  /**
+   * Runs work after the current response has been sent — Next's `after` from
+   * 'next/server' in a route handler. When set, a transition that leaves a
+   * round owing money schedules its settlement right away, in the background
+   * of the request that made it; the scheduled worker remains the backstop.
+   */
+  after?: (work: () => Promise<unknown>) => void;
+  /** Set by createP2P on the player side only: schedules the worker for one round. */
+  settleLater?: (wallet: string, id: string, origin: string) => void;
 }
 export interface MatchResult<Game> {
   id: string;

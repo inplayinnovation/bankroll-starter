@@ -135,7 +135,14 @@ authentication. Pass the game's `p2p.worker.runReconciliation` to
 `reconciliationRoute` as shown in [the recipe](../../../recipes/p2p.md). The
 worker's functions (`runReconciliation`, `reconcileEntry`, `resolveMatch`) live
 under `p2p.worker`, apart from the player surface, because a player request
-never executes a payout: the cron route is their one caller.
+never executes a payout: the cron route is their one caller. What a player
+request does do is schedule one: when a transition leaves a round owing money
+(both rounds terminal, a confirmed cancellation of a paid entry), or a read
+finds the opponent past the start deadline, `changeRound` hands
+`reconcileEntry` for that round to the binding's `after`, and it runs in the
+background once the response is sent. The worker runs without that hook, so
+settling never schedules settling. The schedule is hourly: the backstop for
+players who never came back.
 
 `test/p2p.test.ts` drives this code with a game defined entirely in the test. App suites keep the selected store and the SDK queue real, and mock
 `claimCharge` and `settlePayout` at their public boundary. The SDK owns receipt
