@@ -5,9 +5,9 @@
 Paid, asynchronous two-player entries with SDK matchmaking and recoverable
 settlement. Prompt signals include “play against a friend”, “bet a dollar”,
 “win money”, and “head-to-head”; this mode supplies a queue, not friend invites
-or opponent selection. [Word Hunt on branch p2p](https://github.com/inplayinnovation/bankroll-starter/tree/p2p)
-is the complete worked example. [Mode invariants](../src/lib/p2p/README.md) live
-beside the implementation.
+or opponent selection. [test/p2p.test.ts](../test/p2p.test.ts) is the smallest
+complete game on the mode, entry to settlement. [Mode invariants](../src/lib/p2p/README.md)
+live beside the implementation.
 
 ## Decisions
 
@@ -69,7 +69,7 @@ share a CAS. The SDK refund `payout` field stays at the root.
 If play involves acting at the right moment, read [latency](./latency.md)
 before designing the round: the server only knows when a request arrived.
 
-Bind the game as the worked example's `src/lib/word-hunt/p2p.ts` does:
+Bind the game once, in a server module of its own:
 
 ```ts
 import { HSUSD_MINT } from '@joinbankroll/sdk/server';
@@ -131,5 +131,4 @@ example. `vercel.json` schedules the authenticated endpoint every minute.
 ## Combining
 
 P2P plus practice is a paid game plus a free round with `entry: null`. The game
-creates and plays that round without a payment, ticket or payout, as Word Hunt
-does on branch `p2p`.
+creates and plays that round without a payment, ticket or payout.

@@ -17,7 +17,7 @@ miss on a cell network for the same tap.
 1. **Make the decisive input something other than a moment.** A choice, an
    answer, a path, a sequence, a turn. Timing then bounds the round, not the
    action: the server checks that the action arrived inside the round's window
-   and validates its content. Word Hunt works this way: the server validates
+   and validates its content. A word game works this way: the server validates
    tile paths and words; the clock only ends the round. Costs nothing in
    fairness and is the default for a money game.
 
