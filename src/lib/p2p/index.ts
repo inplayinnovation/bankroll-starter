@@ -9,7 +9,15 @@ import { resolveMatch } from './settlement';
 import type { Context, PaidRound, Round } from './types';
 import { runReconciliation } from './worker';
 
-/** Bind infrastructure and three game hooks once, at the recipe boundary. */
+/**
+ * Bind infrastructure and three game hooks once, at the recipe boundary.
+ *
+ * What comes back has two sides. The player surface is what a request
+ * handler calls: read and change rounds, prepare and confirm an entry, sync
+ * or cancel its ticket. `worker` is the scheduled side: it records match
+ * results and advances payouts and refunds, and only the cron route calls
+ * it. A player request never executes a payout.
+ */
 export function createP2P<G, C extends Json>(
   options: Omit<Context<G, C>, 'policy'> & { policy?: Partial<Policy> },
 ) {
@@ -39,8 +47,10 @@ export function createP2P<G, C extends Json>(
       matching.syncEntry(ctx, wallet, id, origin),
     cancelEntry: (wallet: string, id: string, origin: string) =>
       matching.cancelEntry(ctx, wallet, id, origin),
-    resolveMatch: (round: PaidRound<G, C>) => resolveMatch(ctx, round),
-    reconcileEntry: reconcile,
-    runReconciliation: (origin: string) => runReconciliation(ctx.store, reconcile, origin),
+    worker: {
+      runReconciliation: (origin: string) => runReconciliation(ctx.store, reconcile, origin),
+      reconcileEntry: reconcile,
+      resolveMatch: (round: PaidRound<G, C>) => resolveMatch(ctx, round),
+    },
   };
 }

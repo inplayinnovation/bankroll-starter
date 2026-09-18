@@ -149,11 +149,11 @@ describe('P2P with a second game', () => {
       }),
     );
     await play(a, 9);
-    expect(await mode.resolveMatch(await mode.readEntry(a.wallet, a.id))).toBeNull();
+    expect(await mode.worker.resolveMatch(await mode.readEntry(a.wallet, a.id))).toBeNull();
     await play(b, tie ? 9 : 4);
     const results = await Promise.all([
-      mode.resolveMatch(await mode.readEntry(a.wallet, a.id)),
-      mode.resolveMatch(await mode.readEntry(b.wallet, b.id)),
+      mode.worker.resolveMatch(await mode.readEntry(a.wallet, a.id)),
+      mode.worker.resolveMatch(await mode.readEntry(b.wallet, b.id)),
     ]);
     expect(results[0]).toEqual(results[1]);
     const result = results[0]!;
@@ -172,7 +172,7 @@ describe('P2P with a second game', () => {
     ]);
     expect(result.payout.memo).toBe(`duel:${result.id}`);
     expect(settlePayout).not.toHaveBeenCalled();
-    await mode.reconcileEntry(a.wallet, a.id, origin);
+    await mode.worker.reconcileEntry(a.wallet, a.id, origin);
     expect(
       (await store.readJson<MatchResult<CardGame>>(matchPath(result.id)))!.value.payout.status,
     ).toBe('paid');
@@ -191,7 +191,7 @@ describe('P2P with a second game', () => {
       memo: `refund:${round.id}`,
       recipients: [{ to: round.wallet, token: HSUSD_MINT, amountCents: 100 }],
     });
-    await mode.reconcileEntry(round.wallet, round.id, origin);
+    await mode.worker.reconcileEntry(round.wallet, round.id, origin);
     expect((await mode.readEntry(round.wallet, round.id)).payout?.status).toBe('paid');
   });
 
@@ -202,7 +202,7 @@ describe('P2P with a second game', () => {
     await play(a, 0);
     mode = makeMode({ entryCents: 100, creatorFeeBps: 0, startWindowMs: 99_000 });
     now += 10_000;
-    await mode.reconcileEntry(a.wallet, a.id, origin);
+    await mode.worker.reconcileEntry(a.wallet, a.id, origin);
     const current = await mode.readEntry(a.wallet, a.id);
     if (current.entry.ticket?.state !== 'matched') throw new Error('Expected match');
     const path = matchPath(current.entry.ticket.match.id);

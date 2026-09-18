@@ -131,8 +131,11 @@ outcome and recipients. `entry-index.ts`, `reconcile.ts`, `worker.ts` and
 Only `reconcile.ts` calls SDK `settlePayout`.
 
 A cron route without a bound worker answers `200 { skipped: true, reason: 'p2p_not_configured' }` after
-authentication. Pass the game's `p2p.runReconciliation` to `reconciliationRoute`
-as shown in [the recipe](../../../recipes/p2p.md).
+authentication. Pass the game's `p2p.worker.runReconciliation` to
+`reconciliationRoute` as shown in [the recipe](../../../recipes/p2p.md). The
+worker's functions (`runReconciliation`, `reconcileEntry`, `resolveMatch`) live
+under `p2p.worker`, apart from the player surface, because a player request
+never executes a payout: the cron route is their one caller.
 
 `test/p2p.test.ts` drives this code with a game defined entirely in the test. App suites keep the selected store and the SDK queue real, and mock
 `claimCharge` and `settlePayout` at their public boundary. The SDK owns receipt

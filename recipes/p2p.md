@@ -30,11 +30,13 @@ beside the implementation.
    conditions on the round. Bob enters the same queue and both receive the same
    accepted conditions, including the seed. Inside a round CAS, `startEntry`
    closes cancellation while the game initializes and reveals play state.
-4. Once both rounds are terminal, `resolveMatch` atomically creates
-   `matches/<match-id>.json`. If Alice wins, it records Alice $1.80, Bob $0 and
-   the distinct creator $0.20, with `duel:<id>`. `reconcileEntry`, called by
-   `runReconciliation`, advances that document's SDK payout: all lines share one
-   transaction. A normal treasury retains its $0.20 instead of sending to itself.
+4. Once both rounds are terminal, the scheduled worker takes over: within a
+   minute, `worker.runReconciliation` visits the round, `worker.resolveMatch`
+   atomically creates `matches/<match-id>.json` (if Alice wins: Alice $1.80,
+   Bob $0, the distinct creator $0.20, with `duel:<id>`), and
+   `worker.reconcileEntry` advances that document's SDK payout, all lines in
+   one transaction. A request handler never calls the worker: a player's page
+   load shows stored results and moves no money. A normal treasury retains its $0.20 instead of sending to itself.
    A tie returns $1 each, with a zero creator line when its wallet is distinct.
 5. If nobody joins while Alice waits and she has **not started**,
    `cancelEntry` obtains an SDK cancellation and records a $1 refund on her
@@ -63,6 +65,9 @@ a win/forfeit with the winner's entry ID, or a tie. The mode owns entries,
 tickets, money and the worker; the game owns play, result comparison and screens.
 One round document holds `game` and `entry` sections: start and cancellation
 share a CAS. The SDK refund `payout` field stays at the root.
+
+If play involves acting at the right moment, read [latency](./latency.md)
+before designing the round: the server only knows when a request arrived.
 
 Bind the game as the worked example's `src/lib/word-hunt/p2p.ts` does:
 
@@ -100,7 +105,7 @@ const round = await p2p.prepareEntry(user.wallet, await getOrigin(), game, propo
 return Response.json({ game: gameView(round) }, { headers: { 'cache-control': 'private, no-store' } });
 ```
 
-Bind the cron route with `reconciliationRoute(request, p2p.runReconciliation)`.
+Bind the cron route with `reconciliationRoute(request, p2p.worker.runReconciliation)`.
 Without a game binding, main's authenticated route is a no-op: `200 { skipped: true, reason: 'p2p_not_configured' }`.
 Live matchmaking uses `BANKROLL_APP_KEY` and `BANKROLL_SIGNED_MANIFEST`;
 the scheduled endpoint uses `CRON_SECRET` (see [.env.example](../.env.example)).
