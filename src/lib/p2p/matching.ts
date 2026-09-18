@@ -6,11 +6,12 @@ import {
   type Json,
   type Ticket,
 } from '@joinbankroll/sdk/matchmaking';
+import { mockEnabled } from '@joinbankroll/sdk/mock';
 
 import { GameError } from '@/lib/game-error';
 
 import { changeEntry, createEntry, readEntry } from './entries';
-import { confirmEntry, refund } from './payments';
+import { refund } from './payments';
 import type { Context, GameHooks } from './types';
 
 export const matchmaking = <C extends Json>(origin: string) => createMatchmaking<C>({ origin });
@@ -34,9 +35,12 @@ export async function prepareEntry<G, C extends Json>(
   game: G,
   proposal: C,
 ) {
-  if (!process.env.CRON_SECRET) throw new GameError('reconciliation_not_configured', 503);
+  // Bankroll reports payments to the webhook; without its secret the route
+  // refuses every delivery and no entry could ever be paid. The mock needs none.
+  if (!mockEnabled() && !process.env.BANKROLL_WEBHOOK_SECRET)
+    throw new GameError('webhooks_not_configured', 503);
   await matchmaking<C>(origin).listTickets({ player: wallet, id: 'setup-check' });
-  return createEntry(ctx, wallet, game, proposal, origin);
+  return createEntry(ctx, wallet, origin, game, proposal);
 }
 
 export async function adoptTicket<G, C extends Json>(
@@ -101,7 +105,7 @@ export async function syncEntry<G, C extends Json>(
   id: string,
   origin: string,
 ) {
-  let round = await confirmEntry(ctx, wallet, id);
+  let round = await readEntry(ctx, wallet, id);
   if (round.entry.status === 'cancelled') return round;
   const client = matchmaking<C>(origin);
   if (round.entry.cancelRequested && round.entry.status === 'ready')

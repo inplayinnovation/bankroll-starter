@@ -116,7 +116,7 @@ the balance and Play/Results tabs with empty content.
 - `src/lib/store.ts` — the store backend this app writes documents to; see
   Storage.
 - `src/lib/p2p/` — reusable paid two-player entries, matchmaking and settlement.
-- `src/app/api/cron/reconcile/route.ts` — authenticated scheduler binding for a game.
+- `src/app/api/bankroll/webhook/route.ts` — where Bankroll reports payments; a game binds its `p2p.webhook` here.
 - `src/lib/treasury.ts` — the payee, owner, and payout signer configuration.
 - `src/lib/app-identity.ts` — how the app introduces itself in the manifest:
   its name, where it boots, the tokens it issues, and `BANKROLL_SUPPORT_URL`,

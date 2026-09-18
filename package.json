@@ -10,12 +10,10 @@
     "test": "vitest run",
     "check": "node scripts/check.mjs",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "reconcile": "node scripts/reconcile.mjs",
-    "reconcile:index": "node scripts/index-entries.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@joinbankroll/sdk": "^0.27.1",
+    "@joinbankroll/sdk": "^0.28.0",
     "@vercel/blob": "^2.3.0",
     "next": "^16.0.0",
     "react": "^19.0.0",

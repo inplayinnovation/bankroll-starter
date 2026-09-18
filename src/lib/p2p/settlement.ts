@@ -1,11 +1,12 @@
 import type { Json, Match } from '@joinbankroll/sdk/matchmaking';
 import { MOCK_OPPONENT, mockEnabled } from '@joinbankroll/sdk/mock';
-import { pendingPayout, type PayRecipient } from '@joinbankroll/sdk/server';
+import type { PayRecipient } from '@joinbankroll/sdk/server';
 
 import { GameError } from '@/lib/game-error';
 
 import { finalRound, isGameId, readEntry } from './entries';
 import { adoptTicket } from './matching';
+import { obligation } from './payments';
 import type { Context, FinalRound, MatchResult, PaidRound } from './types';
 
 export const matchPath = (id: string) => `matches/${encodeURIComponent(id)}.json`;
@@ -72,13 +73,14 @@ export async function resolveMatch<G, C extends Json>(
       });
     await ctx.store.createIfAbsent(path, {
       id: match.id,
+      origin: round.entry.origin,
       players,
       outcome,
       winner,
       entryCents: terms.entryCents,
       prizeCents: terms.prizeCents,
       creatorFeeCents: winner === null ? 0 : terms.creatorFeeCents,
-      payout: pendingPayout(terms.payee, recipients, `duel:${match.id}`),
+      payout: obligation(recipients, `duel:${match.id}`),
     } satisfies MatchResult<G>);
   }
   stored = await ctx.store.readJson<MatchResult<G>>(path);

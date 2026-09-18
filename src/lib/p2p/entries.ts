@@ -2,12 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 
 import type { Json } from '@joinbankroll/sdk/matchmaking';
-import { createReference } from '@joinbankroll/sdk/server';
+import { createManagedReference } from '@joinbankroll/sdk/server';
 import { PreconditionFailed, sortableId, TooContended } from '@joinbankroll/sdk/store';
 
 import { GameError } from '@/lib/game-error';
 
-import { indexEntry } from './entry-index';
 import { entryTerms } from './terms';
 import type { Context, Entry, FinalRound, PaidRound, Round } from './types';
 
@@ -50,9 +49,8 @@ function refresh<Game, Conditions extends Json>(
 }
 
 // A round that owes money right now: a refund on a cancelled paid entry, or a
-// matched round whose play is over. The worker settles it; scheduleSettlement
-// below asks for that in the background of this request instead of waiting
-// for the hourly schedule.
+// matched round whose play is over. settleOwing below pays it before this
+// request answers.
 function owing<Game, Conditions extends Json>(
   ctx: Context<Game, Conditions>,
   round: Round<Game, Conditions>,
@@ -71,14 +69,21 @@ function deadlinePassed<Game, Conditions extends Json>(round: Round<Game, Condit
   return Date.now() >= entry.ticket.match.matchedAt + entry.terms.startWindowMs;
 }
 
-function scheduleSettlement<Game, Conditions extends Json>(
+async function settleOwing<Game, Conditions extends Json>(
   ctx: Context<Game, Conditions>,
   before: Round<Game, Conditions>,
   after: Round<Game, Conditions>,
-) {
-  if (!ctx.settleLater || !after.entry?.origin || !owing(ctx, after)) return;
+): Promise<void> {
+  if (!ctx.settle || !after.entry || !owing(ctx, after)) return;
   if (owing(ctx, before) && !deadlinePassed(after)) return;
-  ctx.settleLater(after.wallet, after.id, after.entry.origin);
+  try {
+    await ctx.settle(after.wallet, after.id, after.entry.origin);
+  } catch (error) {
+    // The request that left the round owing still answers. The next request
+    // to touch the round pays it, and Bankroll's expiry of a dead attempt
+    // brings the webhook back to it.
+    console.error(`p2p: paying round ${after.id} failed; the next touch retries it`, error);
+  }
 }
 
 /** Both sections, clock expiry, and replay checks compete on this one key. */
@@ -110,16 +115,17 @@ export async function changeRound<Game, Conditions extends Json>(
     )
       throw new GameError('invalid_round', 409);
     if (next === stored.value) {
-      scheduleSettlement(ctx, stored.value, next);
+      await settleOwing(ctx, stored.value, next);
       return next;
     }
     try {
       await ctx.store.writeJson(path, next, stored.etag);
-      scheduleSettlement(ctx, stored.value, next);
-      return next;
     } catch (error) {
       if (!(error instanceof PreconditionFailed)) throw error;
+      continue;
     }
+    await settleOwing(ctx, stored.value, next);
+    return next;
   }
   throw new TooContended(path, 5);
 }
@@ -146,14 +152,20 @@ export const changeEntry = async <G, C extends Json>(
 export async function createEntry<Game, Conditions extends Json>(
   ctx: Context<Game, Conditions>,
   wallet: string,
+  origin: string,
   game: Game,
   proposal: Conditions,
-  origin?: string,
 ): Promise<PaidRound<Game, Conditions>> {
   const createdAt = Date.now();
   const id = sortableId(createdAt, randomUUID());
   const conditions = ctx.hooks.conditions.validate(proposal);
   const terms = entryTerms(ctx.hooks.conditions.key, ctx.policy, ctx.paymentTerms());
+  // Bankroll watches the chain for the charge carrying this reference and
+  // reports it to the webhook, so a lost client response loses nothing.
+  const { reference, expiresAt } = await createManagedReference(
+    { meta: { kind: 'entry', wallet, id } },
+    { origin },
+  );
   const round: PaidRound<Game, Conditions> = {
     schema: 1,
     kind: ctx.hooks.conditions.key,
@@ -170,10 +182,10 @@ export async function createEntry<Game, Conditions extends Json>(
       terms,
       conditions,
       payment: {
-        reference: createReference(),
+        reference,
+        expiresAt,
         key: randomUUID(),
         memo: `entry:${id}`,
-        offeredUntil: createdAt + 5 * 60_000,
         signature: null,
       },
       // Never substitute accepted conditions into this original retry input.
@@ -188,7 +200,6 @@ export async function createEntry<Game, Conditions extends Json>(
       cancelRequested: false,
     },
   };
-  await indexEntry(ctx.store, wallet, id);
   if (!(await ctx.store.createIfAbsent(roundPath(wallet, id), round)))
     throw new GameError('try_again', 409);
   return round;

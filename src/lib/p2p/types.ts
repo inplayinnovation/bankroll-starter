@@ -1,5 +1,6 @@
 import type { Json, Ticket, TicketInput } from '@joinbankroll/sdk/matchmaking';
-import type { Payout, SettlePayoutOptions } from '@joinbankroll/sdk/server';
+import type { PaymentSigner, PayRecipient } from '@joinbankroll/sdk/server';
+import type { StoreBackend } from '@joinbankroll/sdk/store';
 
 import type { Policy } from './rules';
 
@@ -45,20 +46,47 @@ export interface Entry<Conditions extends Json> {
   status: 'ready' | 'started' | 'cancelled' | 'forfeited';
   startedAt: number | null;
   forfeitedAt: number | null;
-  // Cron may arrive on a deployment URL; admission uses the player's origin.
-  origin?: string;
+  // The player's origin: what admission and Bankroll's app credential use.
+  origin: string;
   terms: EntryTerms;
   payment: {
+    /** A managed reference: Bankroll watches the chain for the charge carrying it. */
     reference: string;
+    /** When Bankroll stops watching. An entry still unpaid then is over. */
+    expiresAt: string;
+    /** The idempotency key the client passes to charge(). */
     key: string;
     memo: string;
-    offeredUntil: number;
+    /** The charge Bankroll reported, once checked against the terms. */
     signature: string | null;
   };
   conditions: Conditions;
   ticketInput: TicketInput<Conditions>;
   ticket: Ticket<Conditions> | null;
   cancelRequested: boolean;
+}
+
+/** One attempt to pay what a document owes. */
+export interface PayoutAttempt {
+  /** A managed reference on the transaction: Bankroll reports where it lands. */
+  reference: string;
+  /** When Bankroll stops watching; a fresh attempt is safe only after this. */
+  expiresAt: string;
+  idempotencyKey: string;
+  startedAt: number;
+  /** The bytes built for it, stored before the send, so a retry resends the same transaction. */
+  transaction: string;
+  /** What the send answered, if it answered before anything went wrong. */
+  signature: string | null;
+}
+/** Money a document owes, paid by one transaction. */
+export interface Payout {
+  recipients: PayRecipient[];
+  memo: string;
+  status: 'pending' | 'sent' | 'paid';
+  attempt: PayoutAttempt | null;
+  /** The landed transaction, from Bankroll's `reference.confirmed`. */
+  signature: string | null;
 }
 
 /** Game and entry share one CAS. Null entry means there is no paid admission. */
@@ -70,29 +98,32 @@ export interface Round<Game, Conditions extends Json> {
   createdAt: number;
   game: Game;
   entry: Entry<Conditions> | null;
-  // The SDK settles a root `payout` field; refunds stay on this same document.
+  // A cancelled paid entry's refund: the round document owes it.
   payout: Payout | null;
 }
 export type PaidRound<Game, Conditions extends Json> = Round<Game, Conditions> & {
   entry: Entry<Conditions>;
 };
 
-export interface Context<Game, Conditions extends Json> extends SettlePayoutOptions {
+export interface Context<Game, Conditions extends Json> {
   hooks: GameHooks<Game, Conditions>;
   policy: Policy;
+  store: StoreBackend;
+  /** The signer for one payout attempt, by its idempotency key. */
+  payoutSigner(idempotencyKey: string): PaymentSigner;
   paymentTerms(): PaymentTerms;
   /**
-   * Runs work after the current response has been sent — Next's `after` from
-   * 'next/server' in a route handler. When set, a transition that leaves a
-   * round owing money schedules its settlement right away, in the background
-   * of the request that made it; the scheduled worker remains the backstop.
+   * Set by createP2P on the player side only: pays what a round owes once a
+   * transition or a read has left it owing, inline, before the request
+   * answers. The settling side runs without it, so settling never triggers
+   * settling.
    */
-  after?: (work: () => Promise<unknown>) => void;
-  /** Set by createP2P on the player side only: schedules the worker for one round. */
-  settleLater?: (wallet: string, id: string, origin: string) => void;
+  settle?: (wallet: string, id: string, origin: string) => Promise<void>;
 }
 export interface MatchResult<Game> {
   id: string;
+  // The origin the payout's managed reference is created under.
+  origin: string;
   players: [FinalRound<Game>, FinalRound<Game>];
   outcome: Outcome;
   winner: string | null;

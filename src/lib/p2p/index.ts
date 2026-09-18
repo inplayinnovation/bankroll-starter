@@ -2,54 +2,43 @@ import type { Json, Ticket } from '@joinbankroll/sdk/matchmaking';
 
 import * as entries from './entries';
 import * as matching from './matching';
-import { confirmEntry } from './payments';
-import { reconcileEntry } from './reconcile';
 import { DEFAULT_POLICY, type Policy } from './rules';
-import { resolveMatch } from './settlement';
+import { settleRound } from './settle';
 import type { Context, PaidRound, Round } from './types';
-import { runReconciliation } from './worker';
+import { webhookHandlers } from './webhook';
 
 /**
  * Bind infrastructure and three game hooks once, at the recipe boundary.
  *
- * What comes back has two sides. The player surface is what a request
- * handler calls: read and change rounds, prepare and confirm an entry, sync
- * or cancel its ticket. `worker` is the scheduled side: it records match
- * results and advances payouts and refunds, and only the cron route calls
- * it. A player request never executes a payout.
+ * What comes back is the player surface a request handler calls: read and
+ * change rounds, prepare an entry, sync or cancel its ticket. Payments never
+ * come from a request: Bankroll watches the chain for every reference the
+ * mode mints and reports to `webhook`, the handlers for the app's
+ * /api/bankroll/webhook route, which is what pays an entry in. Money moves
+ * out without a worker: a transition or a read that leaves a round owing pays
+ * it before the request answers, and the webhook reports the landing.
  */
 export function createP2P<G, C extends Json>(
-  options: Omit<Context<G, C>, 'policy' | 'settleLater'> & { policy?: Partial<Policy> },
+  options: Omit<Context<G, C>, 'policy' | 'settle'> & { policy?: Partial<Policy> },
 ) {
-  // The worker runs without the kick, so settling a round never schedules
-  // another settlement of it: the player side is the only side that kicks.
-  const worker: Context<G, C> = {
+  // Settling runs without the trigger, so paying a round never triggers
+  // paying it again: the player side is the only side that triggers.
+  const settling: Context<G, C> = {
     ...options,
     policy: { ...DEFAULT_POLICY, ...options.policy },
-    settleLater: undefined,
+    settle: undefined,
   };
-  const reconcile = (wallet: string, id: string, origin: string) =>
-    reconcileEntry(worker, wallet, id, origin);
-  const { after } = options;
   const ctx: Context<G, C> = {
-    ...worker,
-    settleLater: after
-      ? (wallet, id, origin) =>
-          after(() =>
-            reconcile(wallet, id, origin).catch((error: unknown) => {
-              // The scheduled worker takes the round on its next pass.
-              console.error(`p2p: background settlement of ${id} failed; the worker retries it`, error);
-            }),
-          )
-      : undefined,
+    ...settling,
+    settle: (wallet, id, origin) => settleRound(settling, wallet, id, origin),
   };
   return {
     readRound: (wallet: string, id: string) => entries.readRound(ctx, wallet, id),
     changeRound: (wallet: string, id: string, change: (round: Round<G, C>) => Round<G, C>) =>
       entries.changeRound(ctx, wallet, id, change),
     supported: (round: Round<G, C>) => entries.supported(ctx, round),
-    createEntry: (wallet: string, game: G, proposal: C, origin?: string) =>
-      entries.createEntry(ctx, wallet, game, proposal, origin),
+    createEntry: (wallet: string, origin: string, game: G, proposal: C) =>
+      entries.createEntry(ctx, wallet, origin, game, proposal),
     prepareEntry: (wallet: string, origin: string, game: G, proposal: C) =>
       matching.prepareEntry(ctx, wallet, origin, game, proposal),
     readEntry: (wallet: string, id: string) => entries.readEntry(ctx, wallet, id),
@@ -58,18 +47,12 @@ export function createP2P<G, C extends Json>(
       id: string,
       change: (round: PaidRound<G, C>) => PaidRound<G, C>,
     ) => entries.changeEntry(ctx, wallet, id, change),
-    confirmEntry: (wallet: string, id: string, signature?: string) =>
-      confirmEntry(ctx, wallet, id, signature),
     adoptTicket: (wallet: string, id: string, ticket: Ticket<C>) =>
       matching.adoptTicket(ctx, wallet, id, ticket),
     syncEntry: (wallet: string, id: string, origin: string) =>
       matching.syncEntry(ctx, wallet, id, origin),
     cancelEntry: (wallet: string, id: string, origin: string) =>
       matching.cancelEntry(ctx, wallet, id, origin),
-    worker: {
-      runReconciliation: (origin: string) => runReconciliation(worker.store, reconcile, origin),
-      reconcileEntry: reconcile,
-      resolveMatch: (round: PaidRound<G, C>) => resolveMatch(worker, round),
-    },
+    webhook: webhookHandlers(ctx),
   };
 }
