@@ -115,6 +115,8 @@ the balance and Play/Results tabs with empty content.
   configuration. `useMe()` in `src/lib/client/bankroll.ts` reads them.
 - `src/lib/store.ts` — the store backend this app writes documents to; see
   Storage.
+- `src/lib/p2p/` — reusable paid two-player entries, matchmaking and settlement.
+- `src/app/api/cron/reconcile/route.ts` — authenticated scheduler binding for a game.
 - `src/lib/treasury.ts` — the payee, owner, and payout signer configuration.
 - `src/lib/app-identity.ts` — how the app introduces itself in the manifest:
   its name, where it boots, the tokens it issues, and `BANKROLL_SUPPORT_URL`,
@@ -128,6 +130,14 @@ Everything that is not this app comes from `@joinbankroll/sdk` and updates with
 route from `/next`; the treasury, charge confirmation, and payouts from
 `/server`; the store backends from `/store`; the dev overlay and host hooks from
 `/react`.
+
+## Recipes
+
+| Mode | Recipe | Module |
+| --- | --- | --- |
+| p2p | [recipes/p2p.md](./recipes/p2p.md) | [src/lib/p2p/](./src/lib/p2p/) |
+
+The f2p and p2e recipes follow when their modules exist.
 
 ## Shared app UI
 

@@ -91,6 +91,16 @@ This is a display, never an authorization check. Payment decisions belong on
 the server. A host without this prerelease capability shows an update hint
 without blocking the app.
 
+## Recipes
+
+| Mode | Recipe | Module |
+| --- | --- | --- |
+| p2p | [recipes/p2p.md](./recipes/p2p.md) | [src/lib/p2p/](./src/lib/p2p/) |
+
+The f2p and p2e recipes follow when their modules exist.
+
+`src/lib/p2p/` supplies reusable paid two-player entries, matchmaking and settlement.
+
 ## Templates
 
 Every branch of this repo is a template — `main` is the skeleton, and each
