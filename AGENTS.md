@@ -137,6 +137,12 @@ route from `/next`; the treasury, charge confirmation, and payouts from
 | --- | --- | --- |
 | p2p | [recipes/p2p.md](./recipes/p2p.md) | [src/lib/p2p/](./src/lib/p2p/) |
 
+Concerns that cut across modes:
+
+| Concern | Recipe |
+| --- | --- |
+| Acting at the right moment over a network | [recipes/latency.md](./recipes/latency.md) |
+
 The f2p and p2e recipes follow when their modules exist.
 
 ## Shared app UI
