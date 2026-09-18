@@ -37,10 +37,14 @@ icons with text labels and stay visible while history scrolls.
 [TabbedScreen](./src/components/tabbed-screen.tsx) supplies this layout.
 
 **Home.** Put play options above the **Play** button. These might be modes or
-dollar amounts when playing for money.
+dollar amounts when playing for money. Home fits the viewport with the tabs
+below it and does not scroll, on a 360-wide phone as much as a tall one: the
+game and its one action, no landing-page headline or marketing copy (the
+lander at `/` is for that). A home tab that overflows is reported as a console
+error in development, which fails `npm run check`.
 
 **Results.** Show the player's game history. Each entry opens that game's result.
-History can scroll.
+History is the tab that scrolls (`scroll: true`); settings, if any, may too.
 
 **Playing.** Play opens the game full screen, without tabs, balance, or `?`.
 Primary gameplay fits on one screen without vertical or horizontal scrolling,

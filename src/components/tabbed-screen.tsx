@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 type Tab = {
   id: string;
@@ -9,8 +9,31 @@ type Tab = {
   /** Optional custom icon; play and results have built-in defaults. */
   icon?: ReactNode;
   content: ReactNode;
+  /** Only history (and settings) scroll. Home fits the viewport; see anatomy.md. */
   scroll?: boolean;
 };
+
+// A non-scrolling tab that does not fit is a layout bug the phone would show
+// as clipped content. Reported in development as a console error, so the
+// starter's check fails on it; never in production.
+function useOverflowCheck(ref: React.RefObject<HTMLElement | null>, tab: Tab) {
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' || tab.scroll) return;
+    const element = ref.current;
+    if (!element) return;
+    const check = () => {
+      if (element.scrollHeight > element.clientHeight + 1) {
+        console.error(
+          `TabbedScreen: the "${tab.id}" tab overflows by ${element.scrollHeight - element.clientHeight}px but does not scroll. ` +
+            'Home fits the viewport with the tabs below it; see anatomy.md.',
+        );
+      }
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [ref, tab]);
+}
 
 const defaultIconPaths: Record<string, ReactNode> = {
   play: <path d="m8 4 12 8-12 8V4Z" />,
@@ -33,6 +56,8 @@ export function TabbedScreen({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const active = tabs.find((tab) => tab.id === searchParams.get('tab')) ?? tabs[0];
+  const content = useRef<HTMLElement | null>(null);
+  useOverflowCheck(content, active);
 
   function tabHref(id: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -50,6 +75,7 @@ export function TabbedScreen({
       {header && <div className="shrink-0">{header}</div>}
       <section
         key={active.id}
+        ref={content}
         aria-label={active.label}
         tabIndex={active.scroll ? 0 : undefined}
         className={`min-h-0 min-w-0 flex-1 overflow-x-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-400 ${

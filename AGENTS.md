@@ -160,10 +160,13 @@ safe-area insets when checking layout.
 top right inside `Gate`. Keeping the header with the surface lets gameplay
 hide it. Reuse `BankrollBalances` for its host reads and formatting.
 
-**Keep footer tabs outside scrolling content.** The app shell fills the dynamic
-viewport height. `TabbedScreen` reserves space for its header and footer and
-gives the remaining height to the selected tab. Set `scroll: true` for history;
-the footer stays visible. The first tab is the default, `?tab=<id>` selects
+**Home fits; only history scrolls.** The app shell fills the dynamic viewport
+height. `TabbedScreen` reserves space for its header and footer and gives the
+remaining height to the selected tab. The home tab must fit that height with
+the tabs below it, without scrolling and without landing copy: the game and
+its one action. Set `scroll: true` only on history (and settings, if any); the
+footer stays visible. In development `TabbedScreen` logs a console error when
+a non-scrolling tab overflows, which `npm run check` reports as a failure. The first tab is the default, `?tab=<id>` selects
 another, and switching uses `replaceState` while preserving other query params.
 The `play` and `results` tab IDs have default icons; `icon` supplies a custom one.
 Render gameplay and individual game results outside `TabbedScreen`; let their
