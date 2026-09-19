@@ -9,7 +9,7 @@ next-env.d.ts
 
 certificates
 # Local filesystem store (STORE=fs)
-bankroll/
+/bankroll/
 TRACKER.md
 
 # Screenshots from `npm run check`
