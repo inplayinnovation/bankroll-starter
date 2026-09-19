@@ -14,13 +14,11 @@ import { matchPath, resolveMatch } from './settlement';
 import type { Context, Payout } from './types';
 
 // A keypair's transaction dies with its blockhash, a minute or two after the
-// build; a Privy signer replays the same idempotency key for a day and
-// declares that window. Bankroll watches for the whole window and reports
-// expiry only after it, which is what makes a fresh transaction safe.
-const KEYPAIR_WINDOW_SECONDS = 5 * 60;
-// A send answers within seconds. A caller that finds an attempt without an
-// answer sooner than this is racing a live send, not recovering a lost one.
-const RESEND_AFTER_MS = 30_000;
+// build, with room here for a stalled chain; a Privy signer replays the same
+// idempotency key for a day and declares that window. Bankroll watches for
+// the whole window and reports expiry only after it, which is what makes a
+// fresh transaction safe.
+const KEYPAIR_WINDOW_SECONDS = 15 * 60;
 
 interface Owing {
   payout: Payout | null;
@@ -31,11 +29,11 @@ const windowFor = (signer: PaymentSigner) =>
 
 /**
  * Pay what a document owes, once per attempt. The attempt's managed
- * reference and built bytes are on the document before the send, so a retry
- * inside the window resends the same transaction under the same idempotency
- * key, and a fresh transaction is built only once Bankroll has let the
- * reference expire. Nothing here waits for the chain: the landing arrives
- * on the webhook as `reference.confirmed`.
+ * reference and built bytes are on the document before the send. From then
+ * on the attempt is Bankroll's to end: `reference.confirmed` closes the
+ * payout, `reference.expired` clears the attempt and a fresh transaction is
+ * built. Nothing here waits for the chain, and nothing is ever sent twice:
+ * an attempt whose send never answered waits for Bankroll like any other.
  */
 export async function settle<G, C extends Json>(
   ctx: Context<G, C>,
@@ -45,47 +43,29 @@ export async function settle<G, C extends Json>(
   const stored = await ctx.store.readJson<Owing>(path);
   const payout = stored?.value.payout ?? null;
   if (!payout || payout.status === 'paid') return payout;
-  let attempt = payout.attempt;
-  const live = attempt !== null && Date.parse(attempt.expiresAt) > Date.now();
-  if (live && (attempt!.signature !== null || Date.now() - attempt!.startedAt < RESEND_AFTER_MS)) return payout;
-  let signer: PaymentSigner;
-  if (live) {
-    signer = ctx.payoutSigner(attempt!.idempotencyKey);
-  } else {
-    const idempotencyKey = randomUUID();
-    signer = ctx.payoutSigner(idempotencyKey);
-    const { reference, expiresAt } = await createManagedReference(
-      { meta: { kind: 'payout', path, origin }, expiresInSeconds: windowFor(signer) },
-      { origin },
-    );
-    const built = await buildPayout(
-      { recipients: payout.recipients, memo: payout.memo, reference },
-      { signer },
-    );
-    attempt = {
-      reference,
-      expiresAt,
-      idempotencyKey,
-      startedAt: Date.now(),
-      transaction: built.transaction,
-      signature: null,
-    };
-    const written = await updateJson<Owing>(ctx.store, path, (current) => {
-      if (!current.payout || current.payout.status === 'paid') return current;
-      // Two callers can get here together: two reads crossing the start
-      // deadline, two finishing transitions, an expiry racing a request.
-      // The first to install a live attempt sends; a live attempt is never
-      // replaced, so the other backs off and its reference expires unseen.
-      const existing = current.payout.attempt;
-      if (existing && Date.parse(existing.expiresAt) > Date.now()) return current;
-      return { ...current, payout: { ...current.payout, attempt } };
-    });
-    // The key is random per caller; the reference is not always (the mock derives it).
-    if (written.payout?.attempt?.idempotencyKey !== idempotencyKey) return written.payout;
-  }
-  const { signature } = await sendPayout(attempt!.transaction, { signer });
+  if (payout.attempt !== null) return payout;
+  const idempotencyKey = randomUUID();
+  const signer = ctx.payoutSigner(idempotencyKey);
+  const { reference, expiresAt } = await createManagedReference(
+    { meta: { kind: 'payout', path, origin }, expiresInSeconds: windowFor(signer) },
+    { origin },
+  );
+  const built = await buildPayout({ recipients: payout.recipients, memo: payout.memo, reference }, { signer });
+  const attempt = { reference, expiresAt, idempotencyKey, transaction: built.transaction, signature: null };
+  const written = await updateJson<Owing>(ctx.store, path, (current) => {
+    if (!current.payout || current.payout.status === 'paid') return current;
+    // Two callers can get here together: two reads crossing the start
+    // deadline, two finishing transitions, an expiry racing a request. The
+    // first to install an attempt sends; an attempt is never replaced, so
+    // the other backs off and its reference expires unseen.
+    if (current.payout.attempt !== null) return current;
+    return { ...current, payout: { ...current.payout, attempt } };
+  });
+  // The key is random per caller; the reference is not always (the mock derives it).
+  if (written.payout?.attempt?.idempotencyKey !== idempotencyKey) return written.payout;
+  const { signature } = await sendPayout(attempt.transaction, { signer });
   const sent = await updateJson<Owing>(ctx.store, path, (current) =>
-    current.payout?.attempt?.idempotencyKey === attempt!.idempotencyKey && current.payout.status !== 'paid'
+    current.payout?.attempt?.idempotencyKey === idempotencyKey && current.payout.status !== 'paid'
       ? {
           ...current,
           payout: {
@@ -142,4 +122,22 @@ export async function settleRound<G, C extends Json>(
   if (!finalRound(ctx, round)) return;
   const match = await resolveMatch(ctx, round);
   if (match) await settle(ctx, matchPath(match.id), entryOrigin);
+}
+
+/**
+ * Bankroll reported the attempt's reference expired: nothing carrying it
+ * landed, so the attempt is cleared. True when that was the attempt in
+ * flight; a stale expiry for some earlier attempt changes nothing.
+ */
+export async function attemptExpired<G, C extends Json>(
+  ctx: Context<G, C>,
+  path: string,
+  reference: string,
+): Promise<boolean> {
+  const updated = await updateJson<Owing>(ctx.store, path, (current) =>
+    current.payout?.attempt?.reference === reference && current.payout.status !== 'paid'
+      ? { ...current, payout: { ...current.payout, status: 'pending', attempt: null } }
+      : current,
+  );
+  return updated.payout?.attempt === null && updated.payout.status === 'pending';
 }

@@ -315,7 +315,7 @@ describe('P2P on managed references', () => {
     expect(await payoutOf(path)).toMatchObject({ status: 'paid' });
   });
 
-  it('builds a fresh attempt only once Bankroll lets the first one expire', async () => {
+  it('builds a fresh attempt only when Bankroll reports the one in flight expired', async () => {
     const a = await enter(42);
     const b = await enter(999);
     await mode.syncEntry(a.wallet, a.id, origin);
@@ -325,22 +325,27 @@ describe('P2P on managed references', () => {
     const first = result.payout.attempt!;
     delivered.length = 0;
 
-    // A stale expiry for a live attempt changes nothing.
-    const expired: ReferenceExpired = {
-      type: 'reference.expired',
-      reference: first.reference,
-      meta: { kind: 'payout', path, origin },
-      expiredAt: first.expiresAt,
-    };
-    await mode.webhook.onExpired(expired);
+    // However old the attempt looks, only Bankroll ends it: reads resend nothing.
+    now = Date.parse(first.expiresAt) + 60_000;
+    await mode.readEntry(a.wallet, a.id);
+    await mode.readEntry(b.wallet, b.id);
     expect((await payoutOf(path)).attempt).toEqual(first);
     expect(delivered).toHaveLength(0);
 
-    // Past the window, the same expiry rebuilds and resends.
-    now = Date.parse(first.expiresAt) + 1;
-    await mode.webhook.onExpired(expired);
+    // An expiry for some other reference changes nothing.
+    const expired = (reference: string): ReferenceExpired => ({
+      type: 'reference.expired',
+      reference,
+      meta: { kind: 'payout', path, origin },
+      expiredAt: first.expiresAt,
+    });
+    await mode.webhook.onExpired(expired('mock-ref-someone-else'));
+    expect((await payoutOf(path)).attempt).toEqual(first);
+    expect(delivered).toHaveLength(0);
+
+    // The expiry of the attempt in flight clears it and a fresh one goes out.
+    await mode.webhook.onExpired(expired(first.reference));
     const second = (await payoutOf(path)).attempt!;
-    expect(second.reference).not.toBe(first.reference);
     expect(second.idempotencyKey).not.toBe(first.idempotencyKey);
     expect(delivered).toEqual([expect.objectContaining({ type: 'reference.confirmed', reference: second.reference })]);
     await bankroll();

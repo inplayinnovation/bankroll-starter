@@ -4,7 +4,7 @@ import type { ReferenceWebhookHandlers } from '@joinbankroll/sdk/webhooks';
 import { GameError } from '@/lib/game-error';
 
 import { confirmEntry, expireEntry } from './payments';
-import { paidOut, settle } from './settle';
+import { attemptExpired, paidOut, settle } from './settle';
 import type { Context } from './types';
 
 // What the mode puts in a managed reference's meta, and gets back on every
@@ -50,8 +50,9 @@ export function webhookHandlers<G, C extends Json>(ctx: Context<G, C>): Referenc
       const meta = referenceMeta(event.meta);
       if (!meta) return;
       if (meta.kind === 'payout') {
-        // The attempt is dead; settle builds a fresh one for what is still owed.
-        await settle(ctx, meta.path, meta.origin);
+        // Bankroll saw nothing land for this attempt: it is over, and settle
+        // builds a fresh one for what is still owed.
+        if (await attemptExpired(ctx, meta.path, event.reference)) await settle(ctx, meta.path, meta.origin);
         return;
       }
       try {

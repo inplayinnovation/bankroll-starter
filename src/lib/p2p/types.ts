@@ -70,11 +70,10 @@ export interface Entry<Conditions extends Json> {
 export interface PayoutAttempt {
   /** A managed reference on the transaction: Bankroll reports where it lands. */
   reference: string;
-  /** When Bankroll stops watching; a fresh attempt is safe only after this. */
+  /** When Bankroll stops watching, and reports expiry if nothing landed. */
   expiresAt: string;
   idempotencyKey: string;
-  startedAt: number;
-  /** The bytes built for it, stored before the send, so a retry resends the same transaction. */
+  /** The bytes built for it, kept for the record. */
   transaction: string;
   /** What the send answered, if it answered before anything went wrong. */
   signature: string | null;
@@ -84,6 +83,11 @@ export interface Payout {
   recipients: PayRecipient[];
   memo: string;
   status: 'pending' | 'sent' | 'paid';
+  /**
+   * The attempt in flight, until Bankroll reports it: confirmed closes the
+   * payout, expired clears it so a fresh attempt can be built. Only
+   * Bankroll knows whether it landed, so only Bankroll ends it.
+   */
   attempt: PayoutAttempt | null;
   /** The landed transaction, from Bankroll's `reference.confirmed`. */
   signature: string | null;
