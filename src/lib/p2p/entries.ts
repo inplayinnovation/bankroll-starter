@@ -77,7 +77,7 @@ async function settleOwing<Game, Conditions extends Json>(
   if (!ctx.settle || !after.entry || !owing(ctx, after)) return;
   if (owing(ctx, before) && !deadlinePassed(after)) return;
   try {
-    await ctx.settle(after.wallet, after.id, after.entry.origin);
+    await ctx.settle(after.wallet, after.id);
   } catch (error) {
     // The request that left the round owing still answers. The next request
     // to touch the round pays it, and Bankroll's expiry of a dead attempt
@@ -198,6 +198,7 @@ export async function createEntry<Game, Conditions extends Json>(
       },
       ticket: null,
       cancelRequested: false,
+      deadline: null,
     },
   };
   if (!(await ctx.store.createIfAbsent(roundPath(wallet, id), round)))

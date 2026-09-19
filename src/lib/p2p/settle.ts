@@ -111,17 +111,16 @@ export async function settleRound<G, C extends Json>(
   ctx: Context<G, C>,
   wallet: string,
   id: string,
-  origin: string,
 ): Promise<void> {
   const round = await readEntry(ctx, wallet, id);
-  const entryOrigin = round.entry.origin || origin;
+  const { origin } = round.entry;
   if (round.entry.status === 'cancelled') {
-    if (round.entry.payment.signature) await settle(ctx, roundPath(wallet, id), entryOrigin);
+    if (round.entry.payment.signature) await settle(ctx, roundPath(wallet, id), origin);
     return;
   }
   if (!finalRound(ctx, round)) return;
   const match = await resolveMatch(ctx, round);
-  if (match) await settle(ctx, matchPath(match.id), entryOrigin);
+  if (match) await settle(ctx, matchPath(match.id), origin);
 }
 
 /**

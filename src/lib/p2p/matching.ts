@@ -7,14 +7,42 @@ import {
   type Ticket,
 } from '@joinbankroll/sdk/matchmaking';
 import { mockEnabled } from '@joinbankroll/sdk/mock';
+import { createManagedReference } from '@joinbankroll/sdk/server';
 
 import { GameError } from '@/lib/game-error';
 
 import { changeEntry, createEntry, readEntry } from './entries';
 import { refund } from './payments';
-import type { Context, GameHooks } from './types';
+import type { Context, GameHooks, PaidRound } from './types';
 
 export const matchmaking = <C extends Json>(origin: string) => createMatchmaking<C>({ origin });
+
+// The shortest window Bankroll watches a reference for.
+const MIN_WINDOW_SECONDS = 60;
+
+// Bankroll is the alarm clock for a no-show. A matched entry mints a
+// reference nobody will pay, expiring at its start deadline; Bankroll's
+// `reference.expired` then brings the webhook back to settle the forfeit
+// when neither player is around to read the round. Both entries in a match
+// set one; the second to fire finds the match settled.
+async function armDeadline<G, C extends Json>(
+  ctx: Context<G, C>,
+  round: PaidRound<G, C>,
+): Promise<PaidRound<G, C>> {
+  const entry = round.entry;
+  if (entry.ticket?.state !== 'matched' || entry.deadline !== null) return round;
+  const dueInMs = entry.ticket.match.matchedAt + entry.terms.startWindowMs - Date.now();
+  const deadline = await createManagedReference(
+    {
+      meta: { kind: 'deadline', wallet: round.wallet, id: round.id },
+      expiresInSeconds: Math.max(MIN_WINDOW_SECONDS, Math.ceil(dueInMs / 1000)),
+    },
+    { origin: entry.origin },
+  );
+  return changeEntry(ctx, round.wallet, round.id, (current) =>
+    current.entry.deadline === null ? { ...current, entry: { ...current.entry, deadline } } : current,
+  );
+}
 
 export function acceptedConditions<G, C extends Json>(
   hooks: GameHooks<G, C>,
@@ -49,7 +77,7 @@ export async function adoptTicket<G, C extends Json>(
   id: string,
   ticket: Ticket<C>,
 ) {
-  return changeEntry(ctx, wallet, id, (round) => {
+  const adopted = await changeEntry(ctx, wallet, id, (round) => {
     const entry = round.entry;
     if (
       ticket.id !== id ||
@@ -97,6 +125,7 @@ export async function adoptTicket<G, C extends Json>(
       },
     };
   });
+  return armDeadline(ctx, adopted);
 }
 
 export async function syncEntry<G, C extends Json>(

@@ -55,7 +55,9 @@ is the smallest complete game on the mode, entry to settlement.
    returns $1 each, with a zero creator line when its wallet is distinct.
    Bankroll delivers `reference.confirmed` when it lands and the document is
    marked paid; the result screen's next poll shows it. A read that finds the
-   opponent past the start deadline pays the forfeit the same way.
+   opponent past the start deadline pays the forfeit the same way, and so does
+   Bankroll's expiry of the deadline reference each matched entry mints, so a
+   no-show is settled even when nobody comes back to look.
 5. If nobody joins while Alice waits and she has **not started**,
    `cancelEntry` obtains an SDK cancellation, records a $1 refund on her round
    under `payout` with `refund:<id>`, and sends it the same way. There is no

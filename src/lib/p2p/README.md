@@ -107,7 +107,10 @@ one. Inside the window, once the send has had time to answer and has not, a
 retry resends the same bytes under the same key, so a crash between the write
 and the send costs nothing. A failed send never
 fails the request: the next request to touch the round, or the expiry, pays.
-There is no worker, lease, index or cron.
+There is no worker, lease, index or cron. The one clock-driven case, a no-show
+after matching, has Bankroll as its alarm: a matched entry mints a reference
+nobody will pay, expiring at its start deadline, and that expiry brings the
+webhook back to settle the forfeit when neither player reads the round.
 
 ## Files and tests
 

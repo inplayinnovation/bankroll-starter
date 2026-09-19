@@ -64,6 +64,13 @@ export interface Entry<Conditions extends Json> {
   ticketInput: TicketInput<Conditions>;
   ticket: Ticket<Conditions> | null;
   cancelRequested: boolean;
+  /**
+   * Bankroll as the alarm clock for a no-show: a reference nobody will pay,
+   * minted when the entry is matched and expiring at its start deadline.
+   * Its `reference.expired` brings the webhook back to settle a forfeit
+   * when neither player is around to read the round.
+   */
+  deadline: { reference: string; expiresAt: string } | null;
 }
 
 /** One attempt to pay what a document owes. */
@@ -122,7 +129,7 @@ export interface Context<Game, Conditions extends Json> {
    * answers. The settling side runs without it, so settling never triggers
    * settling.
    */
-  settle?: (wallet: string, id: string, origin: string) => Promise<void>;
+  settle?: (wallet: string, id: string) => Promise<void>;
 }
 export interface MatchResult<Game> {
   id: string;

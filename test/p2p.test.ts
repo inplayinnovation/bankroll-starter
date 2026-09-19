@@ -269,6 +269,31 @@ describe('P2P on managed references', () => {
     expect(await payoutOf(path)).toMatchObject({ status: 'paid', signature: attempt.signature });
   });
 
+  it('lets Bankroll wake it for a no-show through a deadline reference', async () => {
+    const a = await enter(42);
+    await enter(999);
+    const matched = await mode.syncEntry(a.wallet, a.id, origin);
+    expect(matched.entry.ticket?.state).toBe('matched');
+    expect(parseMockReference(matched.entry.deadline!.reference)?.meta).toEqual({ kind: 'deadline', wallet: a.wallet, id: a.id });
+    expect(matched.entry.deadline!.expiresAt).toBe(new Date(now + 300_000).toISOString());
+    await play(a, 9);
+    expect(delivered).toHaveLength(0);
+
+    // Nobody reads the round after the deadline; Bankroll's expiry does.
+    now += 300_000;
+    await mode.webhook.onExpired({
+      type: 'reference.expired',
+      reference: matched.entry.deadline!.reference,
+      meta: { kind: 'deadline', wallet: a.wallet, id: a.id },
+      expiredAt: matched.entry.deadline!.expiresAt,
+    });
+    const { path, result } = await matchOf(a);
+    expect(result.outcome).toEqual({ kind: 'forfeit', winner: a.id });
+    expect(result.payout.status).toBe('sent');
+    await bankroll();
+    expect(await payoutOf(path)).toMatchObject({ status: 'paid' });
+  });
+
   it('closes an unpaid entry on cancel at once, and still refunds a charge that lands after', async () => {
     const round = await prepare(6);
     const closed = await mode.cancelEntry(round.wallet, round.id, origin);

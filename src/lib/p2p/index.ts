@@ -30,7 +30,7 @@ export function createP2P<G, C extends Json>(
   };
   const ctx: Context<G, C> = {
     ...settling,
-    settle: (wallet, id, origin) => settleRound(settling, wallet, id, origin),
+    settle: (wallet, id) => settleRound(settling, wallet, id),
   };
   return {
     readRound: (wallet: string, id: string) => entries.readRound(ctx, wallet, id),
