@@ -59,8 +59,9 @@ is the smallest complete game on the mode, entry to settlement.
    the Bankroll timer each matched entry sets for that deadline, so a no-show
    is settled even when nobody comes back to look.
 5. If nobody joins while Alice waits and she has **not started**,
-   `cancelEntry` obtains an SDK cancellation, records a $1 refund on her round
-   under `payout` with `refund:<id>`, and sends it the same way. There is no
+   `cancelEntry` obtains an SDK cancellation, prepares the $1 refund (its
+   reference and bytes), records it with the cancellation on her round under
+   `payout` with `refund:<id>`, then sends it the same way. There is no
    automatic unmatched timeout. Starting or being matched prevents
    cancellation; missing the matched start window forfeits rather than
    refunds. An entry the host never paid for ends when Bankroll reports its

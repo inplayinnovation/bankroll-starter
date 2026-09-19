@@ -79,9 +79,10 @@ async function settleOwing<Game, Conditions extends Json>(
   try {
     await ctx.settle(after.wallet, after.id);
   } catch (error) {
-    // The request that left the round owing still answers. The next request
-    // to touch the round pays it, and Bankroll's expiry of a dead attempt
-    // brings the webhook back to it.
+    // The request that left the round owing still answers. A refund never
+    // gets here without its attempt already written (attempt.ts), and a
+    // match payout is retried by the next request once the start window has
+    // passed; Bankroll's expiry of a dead attempt brings the webhook back.
     console.error(`p2p: paying round ${after.id} failed; the next touch retries it`, error);
   }
 }

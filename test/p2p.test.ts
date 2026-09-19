@@ -223,6 +223,34 @@ describe('P2P on managed references', () => {
     expect(await payoutOf(path)).toMatchObject({ status: 'paid' });
   });
 
+  it('writes no cancellation without its refund prepared, and finishes it on the next sync', async () => {
+    const round = await enter(8);
+    let signerDown = true;
+    mode = createP2P({
+      hooks,
+      policy: {},
+      store,
+      payoutSigner: () => {
+        if (signerDown) throw new Error('signer down');
+        return mockPayoutSigner(payee);
+      },
+      paymentTerms: () => ({ payee, creatorWallet, mint: HSUSD_MINT }),
+    });
+    await expect(mode.cancelEntry(round.wallet, round.id, origin)).rejects.toThrow('signer down');
+    const pending = await mode.readEntry(round.wallet, round.id);
+    expect(pending.entry).toMatchObject({ status: 'ready', cancelRequested: true });
+    expect(pending.payout).toBeNull();
+    expect(delivered).toHaveLength(0);
+
+    signerDown = false;
+    const cancelled = await mode.syncEntry(round.wallet, round.id, origin);
+    expect(cancelled.entry.status).toBe('cancelled');
+    const path = roundPath(round.wallet, round.id);
+    expect(await payoutOf(path)).toMatchObject({ status: 'sent', memo: `refund:${round.id}` });
+    await bankroll();
+    expect(await payoutOf(path)).toMatchObject({ status: 'paid' });
+  });
+
   it('snapshots configurable prices, fees, and no-show policy, and pays a forfeit from a read', async () => {
     mode = makeMode({ entryCents: 200, creatorFeeBps: 500, startWindowMs: 10_000 });
     const a = await enter(1);

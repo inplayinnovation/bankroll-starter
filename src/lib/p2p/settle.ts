@@ -1,31 +1,10 @@
-import { randomUUID } from 'node:crypto';
-
 import type { Json } from '@joinbankroll/sdk/matchmaking';
-import {
-  buildPayout,
-  createManagedReference,
-  sendPayout,
-  type PaymentSigner,
-} from '@joinbankroll/sdk/server';
 import { updateJson } from '@joinbankroll/sdk/store';
 
+import { prepareAttempt, sendInstalled, type Owing } from './attempt';
 import { finalRound, readEntry, roundPath } from './entries';
 import { matchPath, resolveMatch } from './settlement';
 import type { Context, Payout } from './types';
-
-// A keypair's transaction dies with its blockhash, a minute or two after the
-// build, with room here for a stalled chain; a Privy signer replays the same
-// idempotency key for a day and declares that window. Bankroll watches for
-// the whole window and reports expiry only after it, which is what makes a
-// fresh transaction safe.
-const KEYPAIR_WINDOW_SECONDS = 15 * 60;
-
-interface Owing {
-  payout: Payout | null;
-}
-
-const windowFor = (signer: PaymentSigner) =>
-  signer.replayWindowMs ? Math.ceil(signer.replayWindowMs / 1000) : KEYPAIR_WINDOW_SECONDS;
 
 /**
  * Pay what a document owes, once per attempt. The attempt's managed
@@ -44,14 +23,7 @@ export async function settle<G, C extends Json>(
   const payout = stored?.value.payout ?? null;
   if (!payout || payout.status === 'paid') return payout;
   if (payout.attempt !== null) return payout;
-  const idempotencyKey = randomUUID();
-  const signer = ctx.payoutSigner(idempotencyKey);
-  const { reference, expiresAt } = await createManagedReference(
-    { meta: { kind: 'payout', path, origin }, expiresInSeconds: windowFor(signer) },
-    { origin },
-  );
-  const built = await buildPayout({ recipients: payout.recipients, memo: payout.memo, reference }, { signer });
-  const attempt = { reference, expiresAt, idempotencyKey, transaction: built.transaction, signature: null };
+  const attempt = await prepareAttempt(ctx, path, origin, payout);
   const written = await updateJson<Owing>(ctx.store, path, (current) => {
     if (!current.payout || current.payout.status === 'paid') return current;
     // Two callers can get here together: two reads crossing the start
@@ -61,22 +33,7 @@ export async function settle<G, C extends Json>(
     if (current.payout.attempt !== null) return current;
     return { ...current, payout: { ...current.payout, attempt } };
   });
-  // The key is random per caller; the reference is not always (the mock derives it).
-  if (written.payout?.attempt?.idempotencyKey !== idempotencyKey) return written.payout;
-  const { signature } = await sendPayout(attempt.transaction, { signer });
-  const sent = await updateJson<Owing>(ctx.store, path, (current) =>
-    current.payout?.attempt?.idempotencyKey === idempotencyKey && current.payout.status !== 'paid'
-      ? {
-          ...current,
-          payout: {
-            ...current.payout,
-            status: 'sent',
-            attempt: { ...current.payout.attempt, signature },
-          },
-        }
-      : current,
-  );
-  return sent.payout;
+  return sendInstalled(ctx, path, written.payout, attempt);
 }
 
 /**

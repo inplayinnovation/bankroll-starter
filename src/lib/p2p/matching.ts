@@ -11,9 +11,10 @@ import { createTimer } from '@joinbankroll/sdk/server';
 
 import { GameError } from '@/lib/game-error';
 
-import { changeEntry, createEntry, readEntry } from './entries';
+import { prepareAttempt, sendInstalled } from './attempt';
+import { changeEntry, createEntry, readEntry, roundPath } from './entries';
 import { refund } from './payments';
-import type { Context, GameHooks, PaidRound } from './types';
+import type { Context, GameHooks, PaidRound, PayoutAttempt } from './types';
 
 export const matchmaking = <C extends Json>(origin: string) => createMatchmaking<C>({ origin });
 
@@ -70,12 +71,28 @@ export async function prepareEntry<G, C extends Json>(
   return createEntry(ctx, wallet, origin, game, proposal);
 }
 
+// A paid entry's refund follows the payout order: reference, write, send. It
+// is prepared before the tombstone is written, so a cancelled paid entry is
+// never on disk without Bankroll watching its refund; if Bankroll cannot
+// mint, the cancel fails and nothing is written. An entry still unpaid, or
+// already cancelled, needs none.
+async function prepareRefund<G, C extends Json>(
+  ctx: Context<G, C>,
+  wallet: string,
+  id: string,
+): Promise<PayoutAttempt | null> {
+  const round = await readEntry(ctx, wallet, id);
+  if (!round.entry.payment.signature || round.entry.status === 'cancelled') return null;
+  return prepareAttempt(ctx, roundPath(wallet, id), round.entry.origin, refund(round));
+}
+
 export async function adoptTicket<G, C extends Json>(
   ctx: Context<G, C>,
   wallet: string,
   id: string,
   ticket: Ticket<C>,
 ) {
+  const refundAttempt = ticket.state === 'cancelled' ? await prepareRefund(ctx, wallet, id) : null;
   const adopted = await changeEntry(ctx, wallet, id, (round) => {
     const entry = round.entry;
     if (
@@ -89,10 +106,13 @@ export async function adoptTicket<G, C extends Json>(
     if (isDeepStrictEqual(entry.ticket, ticket)) return round;
     if (ticket.state === 'cancelled') {
       if (entry.startedAt !== null) throw new GameError('not_refundable', 409);
+      // A charge that landed since the refund was (not) prepared: cancel
+      // again, with the refund prepared, rather than write a debt without one.
+      if (entry.payment.signature && !refundAttempt) throw new GameError('try_again', 409);
       return {
         ...round,
         entry: { ...entry, ticket, status: 'cancelled' },
-        payout: entry.payment.signature ? refund(round) : null,
+        payout: entry.payment.signature ? { ...refund(round), attempt: refundAttempt } : null,
       };
     }
     const conditions = acceptedConditions(ctx.hooks, ticket);
@@ -124,6 +144,7 @@ export async function adoptTicket<G, C extends Json>(
       },
     };
   });
+  if (refundAttempt) await sendInstalled(ctx, roundPath(wallet, id), adopted.payout, refundAttempt);
   return armDeadline(ctx, adopted);
 }
 

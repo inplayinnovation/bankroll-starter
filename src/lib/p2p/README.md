@@ -103,10 +103,12 @@ owing document, then sends. Nothing waits for the chain. Bankroll's
 `reference.confirmed` marks the document paid when its signature is the one
 the send answered (a lost answer is taken on Bankroll's word);
 `reference.expired` means the attempt is dead and `settle` builds a fresh
-one. Inside the window, once the send has had time to answer and has not, a
-retry resends the same bytes under the same key, so a crash between the write
-and the send costs nothing. A failed send never
-fails the request: the next request to touch the round, or the expiry, pays.
+one. A refund is prepared the same way before the cancellation is written:
+reference minted and bytes built, then one write with the tombstone, the
+debt and the attempt, then the send, so a cancelled paid entry is never on
+disk without Bankroll watching its refund, and a cancel Bankroll cannot mint
+for fails with nothing written. A failed send never fails the request: the
+attempt is recorded, and Bankroll's expiry of it brings the webhook back.
 There is no worker, lease, index or cron. The one clock-driven case, a no-show
 after matching, has Bankroll as its alarm: a matched entry sets a timer
 (`createTimer`) for its start deadline, and its `timer.fired` brings the
@@ -118,9 +120,10 @@ webhook back to settle the forfeit when neither player reads the round.
 trigger. `terms.ts` hashes the game compatibility key, saved money terms and
 no-show window into the queue; `rules.ts` provides defaults for the policy
 parameters. `payments.ts` confirms and expires entries; `matching.ts` owns
-tickets; `settlement.ts` records the outcome and recipients; `settle.ts` pays
-what a document owes; `webhook.ts` turns Bankroll's events into those calls.
-Only `settle.ts` sends money.
+tickets; `settlement.ts` records the outcome and recipients; `attempt.ts`
+prepares and sends one payout attempt; `settle.ts` pays what a document owes;
+`webhook.ts` turns Bankroll's events into those calls. Only `attempt.ts`
+sends money.
 
 The app's `src/app/api/bankroll/webhook/route.ts` serves the SDK's
 `bankrollWebhook`; a game passes it `p2p.webhook`, as the

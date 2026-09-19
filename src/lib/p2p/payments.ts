@@ -3,7 +3,8 @@ import { ChargeMismatchError, checkCharge, type PayRecipient } from '@joinbankro
 
 import { GameError } from '@/lib/game-error';
 
-import { changeEntry, readEntry } from './entries';
+import { prepareAttempt, sendInstalled } from './attempt';
+import { changeEntry, readEntry, roundPath } from './entries';
 import type { Context, PaidRound, Payout } from './types';
 
 /** Money a document owes, before any attempt to pay it. */
@@ -48,19 +49,33 @@ export async function confirmEntry<G, C extends Json>(
     if (!(error instanceof ChargeMismatchError)) throw error;
     throw new GameError('payment_mismatch', 400, `payment_mismatch: ${error.field}`);
   }
-  // Cancellation may have won while the charge was checked; record its
-  // refund in this same CAS, and the transition pays it.
-  return changeEntry(ctx, wallet, id, (current) => {
+  // A charge landing on a cancelled entry is refunded, in the payout order:
+  // the refund's reference minted and bytes built before the write that
+  // records the debt, so the debt is never on disk without Bankroll watching
+  // an attempt to pay it. Cancellation winning between this read and the
+  // write is a retry: the delivery fails, Bankroll delivers again, and the
+  // next run prepares the refund.
+  const path = roundPath(wallet, id);
+  const refundAttempt =
+    round.entry.status === 'cancelled' ? await prepareAttempt(ctx, path, round.entry.origin, refund(round)) : null;
+  const written = await changeEntry(ctx, wallet, id, (current) => {
     if (current.entry.payment.signature) return current;
+    let payout = current.payout;
+    if (current.entry.status === 'cancelled') {
+      if (!refundAttempt) throw new GameError('try_again', 409);
+      payout = { ...refund(current), attempt: refundAttempt };
+    }
     return {
       ...current,
       entry: {
         ...current.entry,
         payment: { ...current.entry.payment, signature: charge.signature },
       },
-      payout: current.entry.status === 'cancelled' ? refund(current) : current.payout,
+      payout,
     };
   });
+  if (refundAttempt) await sendInstalled(ctx, path, written.payout, refundAttempt);
+  return written;
 }
 
 /** Bankroll stopped watching an entry's reference. Still unpaid, the entry is over. */
