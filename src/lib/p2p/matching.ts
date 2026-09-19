@@ -135,6 +135,11 @@ export async function cancelEntry<G, C extends Json>(
     if (entry.status !== 'ready' || entry.startedAt !== null)
       throw new GameError('not_refundable', 409);
     if (entry.ticket?.state === 'matched') throw new GameError('already_matched', 409);
+    // Unpaid and never queued, there is nothing at Bankroll to cancel: the
+    // entry closes here, at once. A charge that lands after all is recorded
+    // and refunded by the webhook.
+    if (!entry.payment.signature && !entry.ticket)
+      return { ...current, entry: { ...entry, status: 'cancelled' } };
     return entry.cancelRequested
       ? current
       : { ...current, entry: { ...entry, cancelRequested: true } };

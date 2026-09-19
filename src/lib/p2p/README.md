@@ -81,8 +81,9 @@ runs `checkCharge`, which reads the transaction from the app's RPC and
 compares payee, payer, mint, amount and the entry memo, and only then is the
 signature recorded. The memo names the entry, so one charge
 can buy one entry only. A payment reported after a confirmed cancellation
-still gets recorded and refunded. Host balances never authorize a purchase or
-payout.
+still gets recorded and refunded. A page whose `charge()` threw cancels the
+entry at once; unpaid and never queued, it closes locally with no refund and
+no matchmaking call. Host balances never authorize a purchase or payout.
 
 **One match owns one settlement.** Both round snapshots must be terminal
 before an atomic create at `matches/<match-id>.json` fixes the outcome and the

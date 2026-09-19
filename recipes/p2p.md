@@ -30,6 +30,18 @@ is the smallest complete game on the mode, entry to settlement.
    `/api/bankroll/webhook`: `checkCharge` reads the transaction from the
    app's RPC against her terms, and the signature is CAS-written onto the
    round. Her page polls the round; it never reports the signature itself.
+   If `charge()` throws instead, because she dismissed the sheet or the
+   bridge failed, the page cancels the entry at once rather than leaving it
+   pending until Bankroll reports the reference expired:
+
+   ```ts
+   try {
+     await bankroll.charge({ amountCents: 100, memo: round.payment.memo, idempotencyKey: round.payment.key, reference: round.payment.reference });
+   } catch (error) {
+     await api({ action: 'cancel', id: round.id }); // unpaid: closes locally, no refund, no matchmaking call
+     throw error;
+   }
+   ```
 3. `syncEntry` submits/retrieves the SDK ticket; `adoptTicket` saves accepted
    conditions on the round. Bob enters the same queue and both receive the same
    accepted conditions, including the seed. Inside a round CAS, `startEntry`

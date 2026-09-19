@@ -269,6 +269,20 @@ describe('P2P on managed references', () => {
     expect(await payoutOf(path)).toMatchObject({ status: 'paid', signature: attempt.signature });
   });
 
+  it('closes an unpaid entry on cancel at once, and still refunds a charge that lands after', async () => {
+    const round = await prepare(6);
+    const closed = await mode.cancelEntry(round.wallet, round.id, origin);
+    expect(closed.entry).toMatchObject({ status: 'cancelled', ticket: null, cancelRequested: false });
+    expect(closed.payout).toBeNull();
+    expect(delivered).toHaveLength(0);
+
+    await mode.webhook.onConfirmed(confirmedEntry(round, charge(round)));
+    const path = roundPath(round.wallet, round.id);
+    expect(await payoutOf(path)).toMatchObject({ status: 'sent', memo: `refund:${round.id}` });
+    await bankroll();
+    expect(await payoutOf(path)).toMatchObject({ status: 'paid' });
+  });
+
   it('ends an entry still unpaid when its reference expires, and leaves a paid one alone', async () => {
     const unpaid = await prepare(4);
     const paid = await enter(5);
