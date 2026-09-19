@@ -56,8 +56,8 @@ is the smallest complete game on the mode, entry to settlement.
    Bankroll delivers `reference.confirmed` when it lands and the document is
    marked paid; the result screen's next poll shows it. A read that finds the
    opponent past the start deadline pays the forfeit the same way, and so does
-   Bankroll's expiry of the deadline reference each matched entry mints, so a
-   no-show is settled even when nobody comes back to look.
+   the Bankroll timer each matched entry sets for that deadline, so a no-show
+   is settled even when nobody comes back to look.
 5. If nobody joins while Alice waits and she has **not started**,
    `cancelEntry` obtains an SDK cancellation, records a $1 refund on her round
    under `payout` with `refund:<id>`, and sends it the same way. There is no
@@ -128,7 +128,7 @@ return Response.json({ game: gameView(round) }, { headers: { 'cache-control': 'p
 ```
 
 Bind the webhook route to the game: in `src/app/api/bankroll/webhook/route.ts`,
-`export const POST = referenceWebhook(p2p.webhook)`. Without a game binding,
+`export const POST = bankrollWebhook(p2p.webhook)`. Without a game binding,
 main's route acknowledges deliveries and does nothing with them. Live
 matchmaking and references use `BANKROLL_APP_KEY` and `BANKROLL_SIGNED_MANIFEST`;
 the route verifies deliveries with `BANKROLL_WEBHOOK_SECRET` (see
@@ -147,9 +147,10 @@ STORE=fs npm test
 Main's pages show the skeleton; the worked example adds gameplay. With a bound
 game, the SDK mock adds a stand-in opponent after three seconds; it never plays
 and forfeits at the start deadline. Under the mock nothing reaches Bankroll:
-references are minted locally, the mock host's `charge()` and the mock payout
-signer deliver `reference.confirmed` to the webhook route themselves, and the
-window's end delivers `reference.expired`, so the whole money path runs with
+references and timers are minted locally, the mock host's `charge()` and the
+mock payout signer deliver `reference.confirmed` to the webhook route
+themselves, the window's end delivers `reference.expired` and a timer delivers
+`timer.fired` when it fires, so the whole money path runs with
 no key and no RPC. [test/p2p.test.ts](../test/p2p.test.ts) is the smallest
 working game and money-flow example.
 

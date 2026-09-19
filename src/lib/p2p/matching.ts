@@ -7,7 +7,7 @@ import {
   type Ticket,
 } from '@joinbankroll/sdk/matchmaking';
 import { mockEnabled } from '@joinbankroll/sdk/mock';
-import { createManagedReference } from '@joinbankroll/sdk/server';
+import { createTimer } from '@joinbankroll/sdk/server';
 
 import { GameError } from '@/lib/game-error';
 
@@ -17,14 +17,13 @@ import type { Context, GameHooks, PaidRound } from './types';
 
 export const matchmaking = <C extends Json>(origin: string) => createMatchmaking<C>({ origin });
 
-// The shortest window Bankroll watches a reference for.
-const MIN_WINDOW_SECONDS = 60;
+const MS_PER_MINUTE = 60_000;
 
-// Bankroll is the alarm clock for a no-show. A matched entry mints a
-// reference nobody will pay, expiring at its start deadline; Bankroll's
-// `reference.expired` then brings the webhook back to settle the forfeit
-// when neither player is around to read the round. Both entries in a match
-// set one; the second to fire finds the match settled.
+// Bankroll is the alarm clock for a no-show. A matched entry sets a timer
+// for its start deadline; Bankroll's `timer.fired` then brings the webhook
+// back to settle the forfeit when neither player is around to read the
+// round. Both entries in a match set one; the second to fire finds the
+// match settled. Timers fire to the minute, so the deadline rounds up.
 async function armDeadline<G, C extends Json>(
   ctx: Context<G, C>,
   round: PaidRound<G, C>,
@@ -32,10 +31,10 @@ async function armDeadline<G, C extends Json>(
   const entry = round.entry;
   if (entry.ticket?.state !== 'matched' || entry.deadline !== null) return round;
   const dueInMs = entry.ticket.match.matchedAt + entry.terms.startWindowMs - Date.now();
-  const deadline = await createManagedReference(
+  const deadline = await createTimer(
     {
       meta: { kind: 'deadline', wallet: round.wallet, id: round.id },
-      expiresInSeconds: Math.max(MIN_WINDOW_SECONDS, Math.ceil(dueInMs / 1000)),
+      firesInMinutes: Math.max(1, Math.ceil(dueInMs / MS_PER_MINUTE)),
     },
     { origin: entry.origin },
   );

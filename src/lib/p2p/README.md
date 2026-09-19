@@ -108,8 +108,8 @@ retry resends the same bytes under the same key, so a crash between the write
 and the send costs nothing. A failed send never
 fails the request: the next request to touch the round, or the expiry, pays.
 There is no worker, lease, index or cron. The one clock-driven case, a no-show
-after matching, has Bankroll as its alarm: a matched entry mints a reference
-nobody will pay, expiring at its start deadline, and that expiry brings the
+after matching, has Bankroll as its alarm: a matched entry sets a timer
+(`createTimer`) for its start deadline, and its `timer.fired` brings the
 webhook back to settle the forfeit when neither player reads the round.
 
 ## Files and tests
@@ -123,7 +123,7 @@ what a document owes; `webhook.ts` turns Bankroll's events into those calls.
 Only `settle.ts` sends money.
 
 The app's `src/app/api/bankroll/webhook/route.ts` serves the SDK's
-`referenceWebhook`; a game passes it `p2p.webhook`, as the
+`bankrollWebhook`; a game passes it `p2p.webhook`, as the
 [recipe](../../../recipes/p2p.md) shows. The route refuses a delivery it
 cannot verify; under the mock it accepts the unsigned ones the mock host and
 the mock payout signer send.

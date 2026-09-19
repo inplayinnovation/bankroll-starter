@@ -65,12 +65,12 @@ export interface Entry<Conditions extends Json> {
   ticket: Ticket<Conditions> | null;
   cancelRequested: boolean;
   /**
-   * Bankroll as the alarm clock for a no-show: a reference nobody will pay,
-   * minted when the entry is matched and expiring at its start deadline.
-   * Its `reference.expired` brings the webhook back to settle a forfeit
-   * when neither player is around to read the round.
+   * Bankroll as the alarm clock for a no-show: a timer set when the entry
+   * is matched, firing at its start deadline. Its `timer.fired` brings the
+   * webhook back to settle a forfeit when neither player is around to read
+   * the round.
    */
-  deadline: { reference: string; expiresAt: string } | null;
+  deadline: { id: string; at: string } | null;
 }
 
 /** One attempt to pay what a document owes. */

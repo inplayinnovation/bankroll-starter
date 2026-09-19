@@ -3,7 +3,7 @@ import { rm } from 'node:fs/promises';
 
 import bs58 from 'bs58';
 import { MatchmakingError } from '@joinbankroll/sdk/matchmaking';
-import { mockPayoutSigner, parseMockReference } from '@joinbankroll/sdk/mock';
+import { mockPayoutSigner, parseMockReference, parseMockTimer } from '@joinbankroll/sdk/mock';
 import { HSUSD_MINT } from '@joinbankroll/sdk/server';
 import { storeDirectory } from '@joinbankroll/sdk/store/fs';
 import type { ReferenceConfirmed, ReferenceExpired } from '@joinbankroll/sdk/webhooks';
@@ -269,23 +269,23 @@ describe('P2P on managed references', () => {
     expect(await payoutOf(path)).toMatchObject({ status: 'paid', signature: attempt.signature });
   });
 
-  it('lets Bankroll wake it for a no-show through a deadline reference', async () => {
+  it('lets Bankroll wake it for a no-show through a timer', async () => {
     const a = await enter(42);
     await enter(999);
     const matched = await mode.syncEntry(a.wallet, a.id, origin);
     expect(matched.entry.ticket?.state).toBe('matched');
-    expect(parseMockReference(matched.entry.deadline!.reference)?.meta).toEqual({ kind: 'deadline', wallet: a.wallet, id: a.id });
-    expect(matched.entry.deadline!.expiresAt).toBe(new Date(now + 300_000).toISOString());
+    expect(parseMockTimer(matched.entry.deadline!.id)?.meta).toEqual({ kind: 'deadline', wallet: a.wallet, id: a.id });
+    expect(matched.entry.deadline!.at).toBe(new Date(now + 300_000).toISOString());
     await play(a, 9);
     expect(delivered).toHaveLength(0);
 
-    // Nobody reads the round after the deadline; Bankroll's expiry does.
+    // Nobody reads the round after the deadline; Bankroll's timer does.
     now += 300_000;
-    await mode.webhook.onExpired({
-      type: 'reference.expired',
-      reference: matched.entry.deadline!.reference,
+    await mode.webhook.onFired({
+      type: 'timer.fired',
+      id: matched.entry.deadline!.id,
       meta: { kind: 'deadline', wallet: a.wallet, id: a.id },
-      expiredAt: matched.entry.deadline!.expiresAt,
+      at: matched.entry.deadline!.at,
     });
     const { path, result } = await matchOf(a);
     expect(result.outcome).toEqual({ kind: 'forfeit', winner: a.id });
