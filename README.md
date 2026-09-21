@@ -58,7 +58,7 @@ when you want it.
 
 `npx bankroll token create --name "Promo Credit"` mints your own token: play money that spends in your app and nowhere else, so you can exercise the whole money loop without spending real money. It lands in [`app-tokens.json`](./app-tokens.json), which is the `appTokens` claim your manifest serves.
 
-Everything that is not your app comes from [`@joinbankroll/sdk`](https://www.npmjs.com/package/@joinbankroll/sdk) and [`@joinbankroll/cli`](https://www.npmjs.com/package/@joinbankroll/cli), so it updates with `npm update` rather than a merge.
+Platform primitives come from [`@joinbankroll/sdk`](https://www.npmjs.com/package/@joinbankroll/sdk) and [`@joinbankroll/cli`](https://www.npmjs.com/package/@joinbankroll/cli), and update with `npm update`. The local game engine described below is kept separate from app code for future SDK extraction.
 
 ## Make it yours
 
@@ -91,21 +91,23 @@ This is a display, never an authorization check. Payment decisions belong on
 the server. A host without this prerelease capability shows an update hint
 without blocking the app.
 
-## Recipes
+## P2P game engine
 
-| Mode | Recipe | Module |
-| --- | --- | --- |
-| p2p | [recipes/p2p.md](./recipes/p2p.md) | [src/lib/p2p/](./src/lib/p2p/) |
+[`engine/p2p`](./engine/p2p/README.md) runs paid, asynchronous duels: each
+player completes an independent round, and the game compares their results.
+It owns entry payments, matchmaking, cancellation, deadlines and settlement.
+Apps supply pure game rules and their own screens. A player can play before
+an opponent arrives.
 
-Concerns that cut across modes:
+The [word game](./engine/p2p/examples/words.ts) demonstrates streamed tile
+paths; the [shooting game](./engine/p2p/examples/shooting.ts) validates a
+locally simulated replay. Neither is wired into the starter's empty surface.
+Follow the [engine integration guide](./engine/p2p/README.md) when adding a
+game; the app no longer assembles this lifecycle from a recipe.
 
-| Concern | Recipe |
-| --- | --- |
-| Acting at the right moment over a network | [recipes/latency.md](./recipes/latency.md) |
-
-The f2p and p2e recipes follow when their modules exist.
-
-`src/lib/p2p/` supplies reusable paid two-player entries, matchmaking and settlement.
+[Timed actions and latency](./recipes/latency.md) explains input timing and
+submission windows. [notes/p2p-engine.md](./notes/p2p-engine.md) records the
+engine's design and failure behavior.
 
 ## Templates
 

@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Bankroll reports here on every managed reference this app mints and every
-// timer it sets. The skeleton mints none; bind your game's `p2p.webhook` in
-// place of these handlers, as recipes/p2p.md shows.
+// timer it sets. The skeleton mints none; bind the configured engine's
+// `webhook` in place of these handlers, as engine/p2p/README.md shows.
 export const POST = bankrollWebhook({
   onConfirmed: () => undefined,
   onExpired: () => undefined,

@@ -115,8 +115,11 @@ the balance and Play/Results tabs with empty content.
   configuration. `useMe()` in `src/lib/client/bankroll.ts` reads them.
 - `src/lib/store.ts` — the store backend this app writes documents to; see
   Storage.
-- `src/lib/p2p/` — reusable paid two-player entries, matchmaking and settlement.
-- `src/app/api/bankroll/webhook/route.ts` — where Bankroll reports payments; a game binds its `p2p.webhook` here.
+- `engine/p2p/` — the headless P2P engine; its [README](./engine/p2p/README.md)
+  documents the game contract, server binding and public commands. Examples
+  and tests live alongside it. The skeleton does not bind a game.
+- `src/app/api/bankroll/webhook/route.ts` — where Bankroll reports references
+  and deadlines; bind the configured engine's `webhook` handlers here.
 - `src/lib/treasury.ts` — the payee, owner, and payout signer configuration.
 - `src/lib/app-identity.ts` — how the app introduces itself in the manifest:
   its name, where it boots, the tokens it issues, and `BANKROLL_SUPPORT_URL`,
@@ -125,25 +128,21 @@ the balance and Play/Results tabs with empty content.
   Changing it later re-asks every existing user for consent, so point it at
   something durable.
 
-Everything that is not this app comes from `@joinbankroll/sdk` and updates with
+Platform primitives come from `@joinbankroll/sdk` and update with
 `npm update` rather than being edited here: sessions, origin, and the manifest
 route from `/next`; the treasury, charge confirmation, and payouts from
 `/server`; the store backends from `/store`; the dev overlay and host hooks from
 `/react`.
 
-## Recipes
+## P2P games
 
-| Mode | Recipe | Module |
-| --- | --- | --- |
-| p2p | [recipes/p2p.md](./recipes/p2p.md) | [src/lib/p2p/](./src/lib/p2p/) |
-
-Concerns that cut across modes:
-
-| Concern | Recipe |
-| --- | --- |
-| Acting at the right moment over a network | [recipes/latency.md](./recipes/latency.md) |
-
-The f2p and p2e recipes follow when their modules exist.
+[engine/p2p/README.md](./engine/p2p/README.md) is the integration guide for
+paid, asynchronous two-player games; [notes/p2p-engine.md](./notes/p2p-engine.md)
+records the design. Keep the skeleton unbound until adding an app's game.
+Game rules and UI use the engine's public API; the engine owns the lifecycle.
+Its timers represent queue, no-show and game deadlines. Failed webhooks use
+redelivery, never recovery timers. [recipes/latency.md](./recipes/latency.md)
+covers live inputs and replay timing.
 
 ## Shared app UI
 
