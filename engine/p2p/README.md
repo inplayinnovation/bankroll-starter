@@ -91,8 +91,9 @@ Use the standard handler for `src/app/api/game/route.ts`:
 
 ```ts
 import { getSession } from '@joinbankroll/sdk/next';
-import { createP2PHandler } from '../../../../engine/p2p';
+import { createP2PHandler, EngineError } from '../../../../engine/p2p';
 import { duel } from '@/lib/duel';
+import { isGeoBlocked } from '@/lib/geo';
 
 export const runtime = 'nodejs';
 export const POST = createP2PHandler({
@@ -100,6 +101,8 @@ export const POST = createP2PHandler({
   async authenticate(request) {
     const session = await getSession(request);
     if (!session?.user.identity) return null;
+    if (isGeoBlocked(session.geo))
+      throw new EngineError('forbidden', 'Paid play is unavailable in your current location.');
     return { wallet: session.user.wallet };
   },
 });
@@ -110,6 +113,12 @@ comes from that session, never from a request body. The engine dispatches its
 own protocol; the app does not write an operation switch or individual
 payment, start, and cancellation routes. Browser requests carry the player's
 session through the engine's built-in `bankrollFetch` transport.
+
+The starter's `BANKROLL_GEO_BLOCKLIST` uses exact location codes: `US,US-ME`
+blocks country-only `US` and Maine, while `US-CA` passes. With a configured
+list, missing location is also blocked. `/api/me` returns `geoBlocked` for UI
+feedback; server authentication enforces the same decision on player requests.
+The webhook remains independent of this player-location check.
 
 Then replace the empty handlers in
 `src/app/api/bankroll/webhook/route.ts` with:

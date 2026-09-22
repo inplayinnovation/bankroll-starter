@@ -115,6 +115,8 @@ the balance and Play/Results tabs with empty content.
   configuration. `useMe()` in `src/lib/client/bankroll.ts` reads them.
 - `src/lib/store.ts` — the store backend this app writes documents to; see
   Storage.
+- `src/lib/geo.ts` — `isGeoBlocked(session.geo)` checks `BANKROLL_GEO_BLOCKLIST`
+  against a verified session; `/api/me` exposes `geoBlocked` for the UI.
 - `engine/p2p/` — the headless P2P engine; its [README](./engine/p2p/README.md)
   documents `client.play()`, the game contract and standard server binding. Examples
   and tests live alongside it. The skeleton does not bind a game.
@@ -147,6 +149,22 @@ Paid entries are committed: no voluntary entry cancellation is exposed.
 Its timers represent queue, no-show and game deadlines. Failed webhooks use
 redelivery, never recovery timers. [recipes/latency.md](./recipes/latency.md)
 covers live inputs and replay timing.
+
+## Location restrictions
+
+Set `BANKROLL_GEO_BLOCKLIST` to comma-separated location codes, for example
+`US,US-ME`. Matching is exact: this blocks country-only `US` and Maine, while
+`US-CA` passes. Whitespace and letter case are normalized. An empty or unset
+list disables the restriction; a configured list blocks missing or malformed
+location. Malformed configuration raises an error instead of allowing play.
+
+Call `isGeoBlocked(session.geo)` on the server after `getSession(request)`
+verifies the token, before allowing paid actions. The P2P route example in
+the engine README includes this check. Use `useMe().me.geoBlocked` to explain
+the restriction and disable paid actions in the UI; wait for `me` before
+enabling them. Never authorize against a location supplied in a request body
+or a client-side decision. Webhooks must still process existing payments,
+deadlines and refunds regardless of player location.
 
 ## Shared app UI
 

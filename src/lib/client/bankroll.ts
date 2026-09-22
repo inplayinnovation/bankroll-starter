@@ -23,6 +23,8 @@ export interface Me {
   age: number | null;
   /** Where the user is for this session — not where they live. */
   geo: string | null;
+  /** The server's location decision. Keep paid actions disabled when true. */
+  geoBlocked: boolean;
   /** A payee is configured, so charges work. */
   paymentsConfigured: boolean;
   /** This app's own tokens. Empty when it issues none. */
