@@ -79,7 +79,8 @@ export interface PaymentRequest {
   expiresAt: string;
 }
 
-export interface RoundView<View, Result> {
+/** Internal lifecycle snapshot; never render this as the app's player interface. */
+export interface RoundSnapshot<View, Result> {
   id: string;
   gameId: string;
   version: number;
@@ -106,7 +107,7 @@ export interface RoundView<View, Result> {
     play: number | null;
     submission: number | null;
   };
-  allowed: { start: boolean; act: boolean; cancel: boolean };
+  allowed: { start: boolean; act: boolean };
   outcome: { kind: 'win' | 'loss' | 'tie'; amountCents: number } | null;
   payout: {
     kind: 'prize' | 'refund';
@@ -116,13 +117,20 @@ export interface RoundView<View, Result> {
   issue: string | null;
 }
 
+/** Safe player projection. Payment and start coordination belong to the engine client. */
+export interface RoundView<View, Result>
+  extends Omit<RoundSnapshot<View, Result>, 'sequence' | 'payment' | 'allowed' | 'status'> {
+  status: 'starting' | 'playing' | 'finished' | 'forfeited' | 'cancelled' | 'needs_attention';
+  canAct: boolean;
+}
+
 export interface CommandAcknowledgement {
   id: string;
   sequence: number;
 }
 export interface CommandResult<View, Result> {
   command: CommandAcknowledgement;
-  round: RoundView<View, Result>;
+  round: RoundSnapshot<View, Result>;
 }
 
 /** Core errors deliberately carry no HTTP status or framework response. */

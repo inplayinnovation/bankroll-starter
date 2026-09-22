@@ -3,7 +3,7 @@ import { MOCK_OPPONENT } from '@joinbankroll/sdk/mock';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { wordsGame, type WordsState } from '../examples/words';
-import { createP2PEngine } from '../index';
+import { createLifecycle as createP2PEngine } from '../lifecycle';
 import type { Round } from '../model';
 import { createHarness } from './harness';
 
@@ -41,6 +41,28 @@ function pauseWrite(
   };
   harness.on('store.write.before', inspect);
   return paused;
+}
+
+// Emulate a previously persisted cancellation while an old request resumes.
+// Current app requests have no cancellation operation.
+async function resumeLegacyCancellation(
+  harness: ReturnType<typeof createHarness>,
+  roundId: string,
+) {
+  const reference = [...harness.references.values()].find((reference) =>
+    reference.meta.kind === 'payin' && String(reference.meta.path).endsWith(`/${roundId}.json`),
+  )!;
+  const path = String(reference.meta.path);
+  const stored = (await harness.store.readJson<StoredRound>(path))!;
+  await harness.store.writeJson(path, {
+    ...stored.value,
+    revision: stored.value.revision + 1,
+    cancelRequested: true,
+  }, stored.etag);
+  const event = harness.deliveries.find((event) =>
+    event.type === 'reference.confirmed' && event.reference === reference.reference,
+  )!;
+  await harness.deliver(event);
 }
 
 async function setup(game = wordsGame) {
@@ -88,12 +110,12 @@ describe('engine concurrency', () => {
     expect(harness.stats.casFailures).toBeGreaterThan(0);
   });
 
-  it('cannot reveal a started game when cancellation wins their shared conditional write', async () => {
+  it('cannot reveal a started game after a legacy cancellation wins their shared conditional write', async () => {
     const { harness, engine, roundId } = await setup();
     const paused = pauseWrite(harness, (value) => value.play !== null);
     const starting = engine.start(alice, { roundId, commandId: 'start' });
     await paused.reached;
-    await engine.cancel(alice, { roundId, commandId: 'cancel' });
+    await resumeLegacyCancellation(harness, roundId);
     paused.release();
     await expect(starting).rejects.toMatchObject({ code: 'round_closed' });
     await harness.flush();
@@ -106,16 +128,18 @@ describe('engine concurrency', () => {
     expect(harness.stats.casFailures).toBeGreaterThan(0);
   });
 
-  it('cannot refund when starting wins the cancellation conditional write', async () => {
+  it('concurrent automatic starts commit one clock without resetting the winning start', async () => {
     const { harness, engine, roundId } = await setup();
-    const paused = pauseWrite(harness, (value) => value.cancelRequested);
-    const cancelling = engine.cancel(alice, { roundId, commandId: 'cancel' });
+    const paused = pauseWrite(harness, (value) => value.play !== null);
+    const first = engine.start(alice, { roundId, commandId: 'first-start' });
     await paused.reached;
-    const started = await engine.start(alice, { roundId, commandId: 'start' });
+    harness.advance(1_000);
+    const second = await engine.start(alice, { roundId, commandId: 'second-start' });
     paused.release();
-    await expect(cancelling).rejects.toMatchObject({ code: 'cannot_cancel' });
-    expect(started.round.status).toBe('playing');
-    expect((await engine.get(alice, roundId)).payout).toBeNull();
+    const resumed = await first;
+    expect(resumed.round.status).toBe('playing');
+    expect(resumed.round.deadlines).toEqual(second.round.deadlines);
+    expect((await engine.get(alice, roundId)).deadlines).toEqual(second.round.deadlines);
     expect(harness.transfers).toHaveLength(0);
     expect(harness.stats.casFailures).toBeGreaterThan(0);
   });
@@ -204,7 +228,7 @@ describe('engine concurrency', () => {
     });
     const starting = engine.start(alice, { roundId, commandId: 'start' });
     await paused.reached;
-    await engine.cancel(alice, { roundId, commandId: 'cancel' });
+    await resumeLegacyCancellation(harness, roundId);
     paused.release();
     await expect(starting).rejects.toMatchObject({ code: 'round_closed' });
     await harness.flush();

@@ -1,15 +1,13 @@
 export { createP2PEngine } from './engine';
+export { createP2PHandler } from './http';
 export { defineGame, EngineError } from './types';
 export type {
   Actor,
-  CommandAcknowledgement,
-  CommandResult,
   EngineOptions,
   GameContext,
   GameDefinition,
   OperatorInspection,
   PaymentInspection,
-  PaymentRequest,
   Policy,
   Progress,
   RoundView,

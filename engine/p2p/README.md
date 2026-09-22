@@ -2,13 +2,42 @@
 
 A headless engine for paid, asynchronous duels. Each player completes an
 independent, bounded round; the game compares their results. Players may
-start before an opponent arrives. The engine owns payments, matchmaking,
-cancellation, deadlines and settlement. The app owns its rules and screens.
+start before an opponent arrives. The engine owns the complete player
+lifecycle: Pay → Starting → gameplay → result. The app owns its rules and
+screens.
 
 The starter stays empty: no game singleton, player routes or example UI are
 installed. This guide shows the binding to add when building an app.
 [notes/p2p-engine.md](../../notes/p2p-engine.md) records the design;
-[types.ts](./types.ts) defines the public contract.
+[types.ts](./types.ts) defines the game and view types.
+
+## One play operation
+
+```ts
+import { createP2PClient } from '../../engine/p2p/client';
+
+const game = createP2PClient<GameView, Result>({ endpoint: '/api/game' });
+await game.play();
+```
+
+The engine creates the entry, opens the Bankroll payment sheet, waits for
+verified confirmation and starts the round automatically. One `starting`
+phase covers that whole operation. A successful call returns a running or
+completed round. An opponent is not required to start.
+
+The client supplies payment and command identities, handles delayed webhooks,
+and resumes the same operation after a lost response. Its player views do
+not expose a payment request, a manual start permission or a cancellation
+permission. The app has no lifecycle sequence to assemble.
+
+Approving payment commits the player to the game. The player can dismiss the
+host's payment sheet before approval. There is no voluntary entry-cancellation
+API, including while a paid receipt is still in transit; the server enforces
+this. Queue expiry and other automatic refund rules still apply. Navigating
+away or disposing the client does not cancel a paid entry.
+
+Browser entry points are `engine/p2p/client`, `engine/p2p/react` and
+`engine/p2p/game`. The `engine/p2p` entry point is for server configuration.
 
 ## Bind a game on the server
 
@@ -58,70 +87,29 @@ as whole cents. Offers can override the policy values in [types.ts](./types.ts).
 
 ## Bind routes and the webhook
 
-Each player operation receives an authenticated `{ wallet }` actor. Use the
-session's wallet, never one supplied in the request body. One possible
-`src/app/api/duel/route.ts` is:
+Use the standard handler for `src/app/api/game/route.ts`:
 
 ```ts
 import { getSession } from '@joinbankroll/sdk/next';
-import { EngineError } from '../../../../engine/p2p';
+import { createP2PHandler } from '../../../../engine/p2p';
 import { duel } from '@/lib/duel';
 
 export const runtime = 'nodejs';
-const headers = { 'cache-control': 'private, no-store' };
-
-export async function POST(request: Request) {
-  const session = await getSession(request);
-  if (!session) return Response.json({ error: 'unauthorized' }, { status: 401 });
-  if (!session.user.identity)
-    return Response.json({ error: 'identity_required' }, { status: 403 });
-  const input = await request.json().catch(() => null);
-  if (!input || typeof input !== 'object')
-    return Response.json({ error: 'invalid_request' }, { status: 400 });
-
-  const actor = { wallet: session.user.wallet };
-  const { commandId, roundId } = input;
-  try {
-    let result;
-    switch (input.type) {
-      case 'enter':
-        result = await duel.enter(actor, { commandId, offerId: input.offerId });
-        break;
-      case 'start':
-        result = await duel.start(actor, { roundId, commandId });
-        break;
-      case 'act':
-        result = await duel.act(actor, {
-          roundId, commandId, sequence: input.sequence, action: input.action,
-        });
-        break;
-      case 'cancel':
-        result = await duel.cancel(actor, { roundId, commandId });
-        break;
-      default:
-        return Response.json({ error: 'invalid_request' }, { status: 400 });
-    }
-    return Response.json(result, { headers });
-  } catch (error) {
-    if (!(error instanceof EngineError)) throw error;
-    // The transport owns this mapping; core errors contain no HTTP status.
-    const status = error.code.startsWith('invalid_') ? 400 : 409;
-    return Response.json({ error: error.code }, { status, headers });
-  }
-}
-
-export async function GET(request: Request) {
-  const session = await getSession(request);
-  if (!session) return Response.json({ error: 'unauthorized' }, { status: 401 });
-  const actor = { wallet: session.user.wallet };
-  const query = new URL(request.url).searchParams;
-  const roundId = query.get('roundId');
-  const result = roundId
-    ? await duel.get(actor, roundId)
-    : await duel.history(actor, { cursor: query.get('cursor') ?? undefined });
-  return Response.json(result, { headers });
-}
+export const POST = createP2PHandler({
+  engine: duel,
+  async authenticate(request) {
+    const session = await getSession(request);
+    if (!session?.user.identity) return null;
+    return { wallet: session.user.wallet };
+  },
+});
 ```
+
+The callback verifies the session and the app's player eligibility. Its wallet
+comes from that session, never from a request body. The engine dispatches its
+own protocol; the app does not write an operation switch or individual
+payment, start, and cancellation routes. Browser requests carry the player's
+session through the engine's built-in `bankrollFetch` transport.
 
 Then replace the empty handlers in
 `src/app/api/bankroll/webhook/route.ts` with:
@@ -145,41 +133,73 @@ and webhook secret described in [.env.example](../../.env.example):
 They are separate from the treasury signer. `BANKROLL_MOCK=1` uses the SDK's
 development stand-ins.
 
-## Commands and client flow
+## Connect the UI
 
-| Operation | Input after actor | Result/behavior |
-| --- | --- | --- |
-| `enter` | `{ commandId, offerId? }` | Fix terms/version and return the watched payment request |
-| `start` | `{ roundId, commandId }` | Reconcile admission, commit play and release the challenge |
-| `act` | `{ roundId, commandId, sequence, action }` | Validate one input and apply its transition |
-| `cancel` | `{ roundId, commandId }` | Cancel an eligible entry and establish any refund |
-| `get` | `roundId` | Read one safe player view |
-| `history` | `{ cursor?, limit? }` | Read a page of safe player views |
+Create one client for the app's active surface or provider and subscribe to
+its snapshot. In a React component:
 
-Commands return `{ command, round }`. Keep the same `commandId` and payload
-through a transport retry. A new game action gets a new ID; retrying an action
-gets its original ID. Reuse with different input is rejected. Send the last
-acknowledged gameplay `sequence` with the next action; unrelated payment and
-timer bookkeeping does not advance that sequence. Gameplay deadline transitions
-do advance it; use the latest round view after a refresh.
+```tsx
+'use client';
 
-Use the SDK's `bankrollFetch` on the client so requests carry the player's
-session. After `enter`, retain the round ID and pass its `round.payment`
-amount, memo, reference and idempotency key to `bankroll.charge`. Then read the
-round until `allowed.start` is true. Verified payment automatically joins the
-queue; the browser does not submit a receipt or call `sync`.
+import { useState } from 'react';
+import { createP2PClient } from '../../../engine/p2p/client';
+import { useP2PGame } from '../../../engine/p2p/react';
+import type { WordsResult, WordsView } from '../../../engine/p2p/examples/words';
 
-Starting needs payment and a live ticket, but no opponent. A successful server
-start commits play, even if its response is lost; retry it to recover the same
-board and clock. Cancellation is allowed only before both start and pairing.
-A paid waiter can be matched while away and then forfeit at its start
-deadline. Closing a page alone changes nothing. If a payment-sheet call fails,
-the outcome may be uncertain: keep the entry and explicitly cancel or read it.
+// Inside the component:
+const [game] = useState(() =>
+  createP2PClient<WordsView, WordsResult>({ endpoint: '/api/game' }),
+);
+const { phase, round, error } = useP2PGame(game);
+```
 
-Views include `allowed`, `deadlines`, the permitted `game` view, the player's
-`result`, match `outcome`, and independent `payout` status. Permissions are
-enforced again on the server. A pending payout does not hide or change the
-established result. Reads never advance the lifecycle or send money.
+Render from `phase`:
+
+| Phase | Screen behavior |
+| --- | --- |
+| `idle` | Show Play; its action calls `game.play()` |
+| `starting` | Show “Starting…” while the engine completes payment and admission |
+| `playing` | Render `round.game`; send player input through `game.act(action)` when `round.canAct` |
+| `finished` | Render the result, opponent wait or automatic refund from `round` |
+| `error` | Render `error.message`; `game.resume()` retries the retained workflow |
+
+Workflow failures are reflected in the snapshot. Handle rejected promises in
+UI event handlers; the snapshot supplies the state to render.
+The UI has one Play action. It does not inspect receipt state, open its own
+payment sheet or add another Start button.
+
+| Client method | Purpose |
+| --- | --- |
+| `play({ offerId? })` | Pay and automatically start; concurrent calls share the active operation |
+| `resume(roundId?)` | Reconnect to a selected round or restore the retained operation |
+| `act(action)` | Submit a game input with the engine's command identity and sequence |
+| `get(roundId)` | Read a safe player view without changing the round |
+| `history({ cursor?, limit? })` | Read a page of safe player views |
+| `subscribe(listener)` / `getSnapshot()` | Observe state without React |
+| `dispose()` | Stop this client's local work; never cancel a paid entry |
+
+Use `resume(roundId)` when opening a round deep link; use `resume()` when
+restoring the current tab's retained operation. The default browser
+persistence is session storage, scoped by endpoint. Keep a round ID in the
+URL for navigation. A network failure or ambiguous payment response retains
+the same intent and charge key. Reconnecting continues that intent rather
+than creating another entry or restarting the clock.
+
+The React hook subscribes only. It does not dispose a shared client when a
+component unsubscribes. Keep the client alive across game screens. Call
+`dispose()` when permanently retiring its owner; create a new client before
+using it again. Do not put permanent disposal in a React effect cleanup that
+will be followed by React's development setup cycle.
+
+The server fixes the clock when the automatic start commits. A disconnected
+player is still committed, but a payment webhook does not start an unseen
+clock. The existing queue and no-show rules cover players who never reconnect.
+Reads remain read-only; the browser is not responsible for settlement.
+
+A player view includes its permitted `game`, `result`, deadlines, match
+`outcome`, and independent `payout` status. A pending payout does not hide or
+change the established result. Automatic closure is distinguishable from a
+completed game; no view presents it as a voluntary cancellation action.
 
 ## Define the game
 

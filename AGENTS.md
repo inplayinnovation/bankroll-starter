@@ -116,7 +116,7 @@ the balance and Play/Results tabs with empty content.
 - `src/lib/store.ts` — the store backend this app writes documents to; see
   Storage.
 - `engine/p2p/` — the headless P2P engine; its [README](./engine/p2p/README.md)
-  documents the game contract, server binding and public commands. Examples
+  documents `client.play()`, the game contract and standard server binding. Examples
   and tests live alongside it. The skeleton does not bind a game.
 - `src/app/api/bankroll/webhook/route.ts` — where Bankroll reports references
   and deadlines; bind the configured engine's `webhook` handlers here.
@@ -140,6 +140,10 @@ route from `/next`; the treasury, charge confirmation, and payouts from
 paid, asynchronous two-player games; [notes/p2p-engine.md](./notes/p2p-engine.md)
 records the design. Keep the skeleton unbound until adding an app's game.
 Game rules and UI use the engine's public API; the engine owns the lifecycle.
+The client owns Pay → Starting → gameplay through `play()`, including payment
+confirmation and automatic start. Bind `createP2PHandler` on the server and
+render the client's snapshot; payment and start are not separate app actions.
+Paid entries are committed: no voluntary entry cancellation is exposed.
 Its timers represent queue, no-show and game deadlines. Failed webhooks use
 redelivery, never recovery timers. [recipes/latency.md](./recipes/latency.md)
 covers live inputs and replay timing.

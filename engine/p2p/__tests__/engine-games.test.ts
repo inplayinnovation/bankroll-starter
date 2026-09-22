@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { fsBackend, storeDirectory } from '@joinbankroll/sdk/store/fs';
 import { vercelBlobBackend } from '@joinbankroll/sdk/store/vercel';
 
-import { createP2PEngine } from '../engine';
+import { createLifecycle as createP2PEngine } from '../lifecycle';
 import { shootingGame, simulateShot } from '../examples/shooting';
 import { wordsGame } from '../examples/words';
 import { createHarness } from './harness';
@@ -12,7 +12,7 @@ import { createHarness } from './harness';
 const alice = { wallet: 'alice' };
 const bob = { wallet: 'bob' };
 
-describe('game styles through the public engine', () => {
+describe('game styles through the engine lifecycle', () => {
   it('accepts a shooting replay during submission grace and settles computed scores', async () => {
     const h = createHarness();
     const engine = createP2PEngine({ ...h, game: shootingGame });
@@ -139,7 +139,7 @@ it('persists a complete engine lifecycle using the selected real SDK store', asy
   const store = process.env.STORE === 'blob' ? vercelBlobBackend() : fsBackend();
   const h = createHarness();
   const namespace = `engine-tests/${randomUUID()}`;
-  const settings = { ...h, store, namespace, game: wordsGame };
+  const settings = { ...h, store, namespace, game: wordsGame, offers: { default: { queueWindowMs: 60_000 } } };
   let engine = createP2PEngine(settings);
   h.connect(engine.webhook);
   const first = await engine.enter(alice, { commandId: 'enter' });
@@ -150,7 +150,7 @@ it('persists a complete engine lifecycle using the selected real SDK store', asy
   h.connect(engine.webhook);
   const duplicate = await engine.enter(alice, { commandId: 'enter' });
   expect(duplicate.round.id).toBe(first.round.id);
-  await engine.cancel(alice, { roundId: first.round.id, commandId: 'cancel' });
+  h.advance(60_000); // A real queue deadline owns the automatic refund after restart.
   await h.flush();
   expect((await engine.get(alice, first.round.id)).payout?.status).toBe('paid');
   const page = await engine.history(alice, { limit: 1 });
@@ -212,15 +212,15 @@ it('exposes unpaid obligations to authorized operators without leaking transacti
     ...h,
     game: wordsGame,
     authorizeOperator: (actor) => actor.wallet === 'owner',
+    offers: { default: { queueWindowMs: 60_000 } },
   });
   h.connect(engine.webhook);
   const a = await engine.enter(alice, { commandId: 'enter' });
   h.pay(a.round.payment, alice.wallet);
   await h.flush();
   h.failNext('send.before');
-  await expect(
-    engine.cancel(alice, { roundId: a.round.id, commandId: 'cancel' }),
-  ).rejects.toThrow();
+  h.advance(60_000);
+  await expect(h.flush()).rejects.toThrow();
   const attemptId = h.sends[0].id;
   h.expireAttempt(attemptId);
   await h.flush();

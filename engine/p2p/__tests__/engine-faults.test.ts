@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ConfirmedCharge } from '@joinbankroll/sdk/server';
 
-import { createP2PEngine } from '../index';
+import { createLifecycle as createP2PEngine } from '../lifecycle';
 import {
   wordsGame,
   type WordsChallenge,
@@ -63,6 +63,23 @@ function pathFor(h: Fixture['h'], roundId: string) {
 
 async function entry(h: Fixture['h'], roundId: string) {
   return (await h.store.readJson<Entry>(pathFor(h, roundId)))!.value;
+}
+
+// Persisted cancellations from the prior API remain obligations. The new
+// dispatcher cannot create this marker; only this compatibility fixture does.
+async function restoreLegacyCancellation(h: Fixture['h'], roundId: string) {
+  const path = pathFor(h, roundId);
+  const stored = (await h.store.readJson<Entry>(path))!;
+  await h.store.writeJson(path, {
+    ...stored.value,
+    revision: stored.value.revision + 1,
+    cancelRequested: true,
+  }, stored.etag);
+  const event = h.deliveries.find((event) =>
+    event.type === 'reference.confirmed' && event.reference === stored.value.payment!.reference,
+  );
+  if (!event) throw new Error('Missing original payment event');
+  await h.deliver(event);
 }
 
 function interruptMatchingWrite(h: Fixture['h'], matches: (path: string, value: Entry) => boolean) {
@@ -187,7 +204,7 @@ describe('engine webhook interruption and ownership', () => {
     });
   });
 
-  it('lets pairing win an in-flight cancellation without also refunding the matched ticket', async () => {
+  it('lets pairing win a legacy cancellation resumption without refunding the matched ticket', async () => {
     const f = fixture();
     const a = await paidEntry(f);
     const { round: b } = await f.engine.enter(bob, { commandId: 'enter-bob' });
@@ -195,8 +212,8 @@ describe('engine webhook interruption and ownership', () => {
       const event = f.h.pay(b.payment, bob.wallet);
       await f.h.deliver(event);
     });
-    const result = await f.engine.cancel(alice, { roundId: a, commandId: 'cancel-a' });
-    expect(result.round).toMatchObject({
+    await restoreLegacyCancellation(f.h, a);
+    expect(await f.engine.get(alice, a)).toMatchObject({
       opponent: 'matched',
       allowed: { start: true },
       payout: null,
@@ -207,14 +224,14 @@ describe('engine webhook interruption and ownership', () => {
     expect((await entry(f.h, a)).cancelRequested).toBe(false);
   });
 
-  it('lets a cancellation tombstone defeat delayed pairing and refunds only that entry', async () => {
+  it('honors a legacy cancellation tombstone against delayed pairing and refunds only that entry', async () => {
     const f = fixture();
     const a = await paidEntry(f);
     const { round: b } = await f.engine.enter(bob, { commandId: 'enter-bob' });
     f.h.on('cancelTicket.after', async () => {
       await f.h.deliver(f.h.pay(b.payment, bob.wallet));
     });
-    await f.engine.cancel(alice, { roundId: a, commandId: 'cancel-a' });
+    await restoreLegacyCancellation(f.h, a);
     await f.h.flush();
     expect(await f.engine.get(alice, a)).toMatchObject({
       status: 'cancelled',

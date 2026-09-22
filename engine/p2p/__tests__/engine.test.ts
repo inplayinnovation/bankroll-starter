@@ -8,13 +8,13 @@ import {
   type WordsState,
   type WordsView,
 } from '../examples/words';
-import { createP2PEngine } from '../index';
-import type { Actor, EngineOptions, RoundView } from '../types';
+import { createLifecycle as createP2PEngine } from '../lifecycle';
+import type { Actor, EngineOptions, RoundSnapshot } from '../types';
 import { createHarness } from './harness';
 
 const alice = { wallet: 'alice' };
 const bob = { wallet: 'bob' };
-type View = RoundView<WordsView, WordsResult>;
+type View = RoundSnapshot<WordsView, WordsResult>;
 type Options = EngineOptions<WordsChallenge, WordsState, WordsAction, WordsResult, WordsView>;
 
 function setup(options: Partial<Options> = {}) {
@@ -87,7 +87,7 @@ describe('paid asynchronous duel engine', () => {
       paid: true,
       opponent: 'waiting',
       game: null,
-      allowed: { start: true, cancel: true },
+      allowed: { start: true },
     });
     expect(ready.deadlines.queue).toBe(harness.now() + 24 * 60 * 60_000);
     expect(harness.tickets.get(entry.id)?.admission?.input.expiresAt).toBe(ready.deadlines.queue);
@@ -211,47 +211,31 @@ describe('paid asynchronous duel engine', () => {
     expect(test.harness.sends).toHaveLength(sends);
   });
 
-  it('refunds voluntary cancellation before play and refunds a late payment after cancellation', async () => {
+  it('refunds a late payment to an automatically expired unpaid entry', async () => {
     const test = setup();
-    const paid = await test.paid(alice);
-    const cancelled = await test.engine.cancel(alice, {
-      roundId: paid.id,
-      commandId: 'cancel-paid',
-    });
-    expect(cancelled.round).toMatchObject({
+    const pending = await test.enter(alice);
+    test.harness.advance(Date.parse(pending.payment!.expiresAt) - test.harness.now());
+    await test.harness.flush();
+    expect(await test.engine.get(alice, pending.id)).toMatchObject({
       status: 'cancelled',
-      opponent: 'cancelled',
-      payout: { kind: 'refund', status: 'sent' },
+      paid: false,
+      game: null,
+      payout: null,
     });
+    const event = test.harness.pay(pending.payment, alice.wallet);
+    await test.harness.deliver(event); // A delayed confirmation arrives after observation expiry.
     await test.harness.flush();
-    expect((await test.engine.get(alice, paid.id)).payout?.status).toBe('paid');
-    const pending = await test.enter(bob);
-    await test.engine.cancel(bob, { roundId: pending.id, commandId: 'cancel-unpaid' });
-    expect(test.harness.transfers).toHaveLength(1);
-    test.harness.pay(pending.payment, bob.wallet);
-    await test.harness.flush();
-    expect((await test.engine.get(bob, pending.id)).payout).toMatchObject({
-      kind: 'refund',
-      status: 'paid',
+    await test.harness.deliver(event);
+    expect(await test.engine.get(alice, pending.id)).toMatchObject({
+      status: 'cancelled',
+      paid: true,
+      game: null,
+      payout: { kind: 'refund', status: 'paid' },
     });
     expect(test.harness.transfers.map((transfer) => transfer.recipients)).toEqual([
       [{ to: alice.wallet, amountCents: 100 }],
-      [{ to: bob.wallet, amountCents: 100 }],
     ]);
     expect(test.harness.matches.size).toBe(0);
-  });
-
-  it('refuses voluntary cancellation after start or matching', async () => {
-    const test = setup();
-    const a = await test.start(alice, await test.paid(alice));
-    await expect(
-      test.engine.cancel(alice, { roundId: a.id, commandId: 'cancel-playing' }),
-    ).rejects.toMatchObject({ code: 'cannot_cancel' });
-    const b = await test.paid(bob);
-    await expect(
-      test.engine.cancel(bob, { roundId: b.id, commandId: 'cancel-matched' }),
-    ).rejects.toMatchObject({ code: 'cannot_cancel' });
-    expect(test.harness.transfers).toHaveLength(0);
   });
 
   it('refunds an unmatched completed round at the authoritative queue cutoff', async () => {

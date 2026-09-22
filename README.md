@@ -95,9 +95,10 @@ without blocking the app.
 
 [`engine/p2p`](./engine/p2p/README.md) runs paid, asynchronous duels: each
 player completes an independent round, and the game compares their results.
-It owns entry payments, matchmaking, cancellation, deadlines and settlement.
-Apps supply pure game rules and their own screens. A player can play before
-an opponent arrives.
+Its headless client owns Pay → Starting → gameplay through one `play()` call;
+the server owns admission, matchmaking, deadlines and settlement. Apps supply
+pure game rules and their own screens. A player can play before an opponent
+arrives. Payment commits the entry; there is no paid cancellation window.
 
 The [word game](./engine/p2p/examples/words.ts) demonstrates streamed tile
 paths; the [shooting game](./engine/p2p/examples/shooting.ts) validates a

@@ -1,6 +1,6 @@
 # P2P game engine
 
-**Status: implemented in the starter, 2026-09-21.**
+**Status: pay-and-play revision implemented and tested in the starter, 2026-09-21.**
 
 This is the current specification for `engine/p2p`. The superseded intermediary notes have been removed to keep one design reference.
 
@@ -10,7 +10,7 @@ A headless SDK engine for paid, asynchronous two-player games. Each player compl
 
 An app supplies its rules, approved prices, treasury configuration and UI. The engine supplies the complete payment, matchmaking and round lifecycle. Changing the game's interaction model or presentation does not require copying its bookkeeping.
 
-The initial engine uses existing Bankroll primitives and the SDK store. It runs inside the app server. It introduces no Bankroll payment service, generic job runner, recovery timer or requirement for matchmaking webhooks. Live shared simulations and alternating-turn games are outside this version's scope.
+The engine includes a server lifecycle and a headless browser client. The client owns the complete player workflow; the server uses existing Bankroll primitives and the SDK store. It introduces no Bankroll payment service, generic job runner, recovery timer or requirement for matchmaking webhooks. Live shared simulations and alternating-turn games are outside this version's scope.
 
 ## 2. Ownership
 
@@ -18,6 +18,7 @@ The initial engine uses existing Bankroll primitives and the SDK store. It runs 
 | --- | --- |
 | Bankroll server | Matchmaking, managed-reference observation, game timers, signed webhook delivery and redelivery |
 | SDK engine in the app server | Payment records and attempts; calls through the configured treasury adapter; ticket submission; round transitions; deadlines; match decisions; receipt validation; idempotent processing |
+| Engine browser client | Entry intent, payment-sheet invocation, confirmation waiting, automatic start, command identity, reconnects and safe player projections |
 | Game definition | Challenge generation, input validation, pure gameplay transitions, safe game views and comparison of completed results |
 | App | Verified player authentication, server configuration, route binding, screens, animation, navigation and sound |
 
@@ -25,7 +26,9 @@ The engine stores its documents in the app's configured SDK store. A hosted trea
 
 ```mermaid
 flowchart LR
-    UI[App UI] <-->|Commands and safe views| E
+    UI[App UI] <-->|Play, game inputs, safe views| C[Engine browser client]
+    C <-->|Engine protocol| E
+    C <-->|Payment sheet| H[Bankroll host]
     subgraph APP["App server"]
         E[SDK engine] --> G[Game rules]
         E --> T[Configured treasury adapter]
@@ -39,7 +42,9 @@ The initial implementation replaces the reusable behavior in `src/lib/p2p` with 
 
 ## 3. Player lifecycle and default policy
 
-**Enter → pay → join the queue → play → await the opponent if needed → receive the result and payment.**
+**Tap Play → approve payment → briefly “Starting…” → gameplay → await the opponent if needed → receive the result and payment.**
+
+One `play()` operation owns entry creation, payment, server confirmation and starting. There is no successful-payment path that asks the player to complete payment again or tap a second Start button. Those intermediate transitions are engine implementation details. The app renders one `starting` state while they complete.
 
 These defaults preserve the original mode's player flow:
 
@@ -48,9 +53,9 @@ These defaults preserve the original mode's player flow:
 | Entry price | $1 by default; the app can publish other approved offers |
 | Creator fee | 10% of the combined pot on a win; configurable, with whole-cent validation before payment |
 | Admission | A verified payment enters the queue automatically; the browser does not call `sync` |
-| Starting | Requires verified payment and an accepted live ticket; an opponent is not required |
-| Commitment | A successful server `start` transition commits the stake and authorizes release of the challenge |
-| Voluntary cancellation | Allowed only before starting and before pairing; matchmaking arbitrates cancellation against pairing |
+| Starting | The client automatically starts after verified payment and accepted admission; an opponent is not required. The server fixes the game clock once. |
+| Commitment | `play()` records intent to play if payment succeeds. A valid paid entry is committed even while confirmation or automatic start is pending. |
+| Voluntary cancellation | The player may dismiss the host payment sheet before authorizing payment. The engine exposes no entry-cancellation operation, before or after payment confirmation. |
 | Queue cutoff | 24 hours from recorded payment acceptance by default; the original absolute cutoff is also submitted as the ticket's `expiresAt` |
 | Queue expiry | If authoritative cancellation succeeds, refund the stake, including for a player who already played. A match formed before the cutoff wins |
 | No-show | Either paired player who has not started forfeits five minutes after `matchedAt`, even if that player has gone offline |
@@ -60,53 +65,51 @@ These defaults preserve the original mode's player flow:
 
 For a $1 entry and 10% fee, a win pays $1.80 and allocates $0.20 to the creator. If the treasury is the creator, its fee stays in the treasury. Ties refund $1 to each player. Amounts use HSUSD in whole cents; this version rejects other configured mints and does not claim arbitrary token precision.
 
-A queue timeout closes the entry if no match exists. It cannot refund a matched stake independently of the match. Closing a browser page is not a server cancellation. A payment-sheet error can be ambiguous; the client retains the entry ID and can query it or explicitly request cancellation.
+A queue timeout closes the entry if no match exists. It cannot refund a matched stake independently of the match. Closing a browser page is not a server cancellation. A payment-sheet error can be ambiguous. The engine client retains the entry identity and charge key so resuming cannot create a second entry or silently abandon a paid one. Client disposal stops local observation; it does not cancel the entry. Unpaid references expire through the existing primitive. Automatic refunds remain available for queue expiry, invalid pay-ins and already-closed entries receiving a late payment.
 
 ## 4. Public API
 
-Bind the engine once to game definitions, server-approved offers, the store, origin and treasury adapter. The implementation exposes this public command vocabulary (see `engine/p2p/README.md` for binding examples):
+The normal app API is the headless client in `engine/p2p/client`, with an optional React subscription hook in `engine/p2p/react`. It is part of the engine, not a recipe the app must reproduce.
 
 ```ts
-const engine = createP2PEngine({
-  game: words,
-  previousVersions: [],
-  offers,
-  store,
-  treasury,
-  origin,
-});
+const game = createP2PClient<GameView, Result>({ endpoint: '/api/game' });
 
-// actor comes from verified server authentication, never a browser wallet field.
-await engine.enter(actor, { offerId, commandId });
-await engine.start(actor, { roundId, commandId });
-await engine.act(actor, { roundId, commandId, sequence, action });
-await engine.cancel(actor, { roundId, commandId });
-await engine.get(actor, roundId);
-await engine.history(actor, { cursor, limit });
-
-// Separate server-authorized operator access.
-await engine.inspect(operator, { wallet, roundId });
-await engine.reconcile(operator, { wallet, roundId });
-
-// The existing SDK wrapper verifies webhook authenticity before dispatch.
-export const POST = bankrollWebhook(engine.webhook);
+await game.play();                // Optional { offerId }; completes entry through automatic start.
+await game.resume(roundId);       // Reconnect; omit the ID to restore the retained workflow.
+await game.act(action);           // Engine supplies sequence and a stable command ID.
+await game.get(roundId);          // Read-only inspection.
+await game.history({ cursor, limit });
+const unsubscribe = game.subscribe(render);
+game.getSnapshot();
+game.dispose();                   // Stops local work; never cancels a paid entry.
 ```
 
-| Operation | Contract |
-| --- | --- |
-| `enter` | Fix terms and game version; persist an entry and watched pay-in; return the round and player payment request |
-| `start` | Reconcile ticket status, enforce cancellation and no-show rules, persist gameplay and its deadline, then return the permitted challenge/view |
-| `act` | Validate and apply one game action; perform any resulting finalization before acknowledging the command |
-| `cancel` | Serialize against start, obtain the authoritative ticket disposition where needed, and establish any refund attempt |
-| `get`, `history` | Read stored state and safe projections only; never advance gameplay, contact matchmaking to mutate state, or send payments |
+A client snapshot has one `starting` phase for the whole pay-and-start operation, followed by `playing`, `finished`, or an actionable `error`. It includes a safe round view when available. Idle is the state before a play intent. The player projection does not include payment requests, internal `ready`/`awaiting_payment` states, `allowed.start`, or `allowed.cancel`. UI authors cannot accidentally turn those internal details into extra CTAs. An immediately completed game can transition directly to `finished`.
 
-Commands accept stable client-generated IDs. The engine records each accepted command's identity, input fingerprint and acknowledgement with its transition. An identical retry cannot create a second entry, restart a clock or score an action twice. Reusing an ID with different input fails. Retrying a partially processed command resumes its remaining consequences before returning success.
+The client owns command IDs, same-input retries, active-entry persistence, charge idempotency, confirmation waiting, action sequence and reconnection. The app keeps one client for its active surface; concurrent calls on it share the operation rather than opening multiple payment sheets or creating duplicate entries. Lost responses retain the same operation identity. A definite payment-sheet dismissal leaves no new paid entry; an uncertain outcome remains associated with its original entry. Network failures retain enough state to resume. Observing confirmation may poll read-only state; it does not introduce server recovery timers or a browser-owned settlement worker. The existing webhook and game deadlines continue to own durable consequences when the browser is absent.
 
-`sequence` identifies the gameplay state the action was based on. It is separate from storage revision and game version. A payment webhook cannot invalidate an otherwise current gameplay sequence. Concurrent actions from different tabs cannot silently overwrite each other.
+The client never starts an unpaid game, acknowledges an unconfirmed payment as paid, or restarts an existing game clock. Its normal successful call returns a running or completed round, rather than an instruction for the app to call `start`. Browser-side waiting and request retries are bounded/cancellable and clean up on disposal. Reloading or resuming an existing entry does not issue a fresh charge key.
 
-Responses contain a safe round view and, for commands, the command acknowledgement. The view includes payment requirements, game view, own result, pairing status, authoritative deadlines, permitted actions, final match outcome and payout status. It never exposes raw documents, signing material or an opponent's unreleased result. A won result and a pending payment can be displayed separately.
+Server configuration remains independent of UI:
 
-The server enforces permissions even if a displayed view is stale. Core errors use domain codes; route adapters choose HTTP responses.
+```ts
+const engine = createP2PEngine({ game: words, store, treasury, origin, offers });
+export const POST = createP2PHandler({ engine, authenticate });
+// authenticate(request) supplies a verified player Actor or null.
+// The app verifies player eligibility in that callback.
+export const POST = bankrollWebhook(engine.webhook); // In the separate webhook route.
+
+await engine.inspect(operator, { wallet, roundId });
+await engine.reconcile(operator, { wallet, roundId });
+```
+
+`createP2PEngine` exposes the engine-owned request dispatcher, webhook handlers and operator operations. It does not expose app assembly methods named `enter`, `start` or `cancel`. `createP2PHandler` binds the standard engine transport to verified authentication; apps do not write an operation switch or coordinate lifecycle calls. The browser protocol necessarily carries an internal payment request to the engine client, but that request never becomes a normal player-view field.
+
+Cancellation is rejected at the server dispatcher for every new play intent, including before the payment webhook arrives. Hiding a button is not the enforcement. This removes the confirmation-delay race in which a payment could be locally cancelled while its receipt was still in transit. Existing persisted cancellations from the previous engine remain financial obligations and are honored; the new API cannot create them.
+
+The internal server start transition still releases the accepted challenge and fixes the authoritative clock. It runs automatically through the engine client/server workflow once payment is accepted. Reads stay read-only. Payment webhooks perform admission without requiring a browser acknowledgement, and do not independently start a clock for a disconnected client.
+
+Each accepted action records its identity, input fingerprint and acknowledgement with its transition. Retrying cannot score twice. The client owns `sequence`, which changes for gameplay transitions but not unrelated payment bookkeeping. Low-level snapshots and commands are internal protocol details, not the app integration surface.
 
 ## 5. Game contract and different UX
 
@@ -147,18 +150,18 @@ A game can request intermediate **gameplay** deadlines. At its fixed final cutof
 
 Command/deadline races are decided through conditional writes. Each command uses a fixed server admission time, checked against the applicable deadline and preserved if accepted. A deadline already committed cannot be undone by a late command. Rejected commands grant no additional play time. The acceptance tests must exercise both orderings.
 
-The app currently manages command IDs, payment-sheet invocation, reconnects and reads using the documented command contract. A reusable client controller is an optional future convenience; it is not required by this engine or included in this version. Practice can reuse the pure game definition and UI without creating fake paid entries or converting practice results into paid results.
+The engine client manages command IDs, payment-sheet invocation, reconnects, confirmation waiting and automatic start. The app uses that workflow directly and supplies rendering and game inputs. Practice can reuse the pure game definition and UI without creating fake paid entries or converting practice results into paid results.
 
 ## 6. Pay-in and matchmaking processing
 
-`enter` creates the managed reference and persists the expected payer, payee, asset, amount, memo, expiry and player charge key before returning the payment request. The accepted offer and treasury configuration are pinned to the entry. Hidden game conditions remain private until start.
+The internal entry preparation used by `play()` creates the managed reference and persists the expected payer, payee, asset, amount, memo, expiry and player charge key before returning the payment request. The accepted offer and treasury configuration are pinned to the entry. Hidden game conditions remain private until start.
 
 Pay-in reference expiry closes an unaccepted payment request. The entry remains available for a later verified confirmation, which follows the cancelled-entry refund path rather than reopening admission. The UI must not offer an expired payment request.
 
 The payment-confirmed handler performs the complete admission operation:
 
 1. Validate the receipt against the entry and record the actual confirmed facts. One receipt can fund at most one entry.
-2. If the entry was cancelled, establish its watched refund instead of admitting it.
+2. If the entry was already closed by reference expiry or legacy cancellation, establish its watched refund instead of admitting it. A new play intent has no voluntary cancellation path.
 3. Otherwise persist the original ticket input and queue cutoff, with the queue-deadline timer safely registered.
 4. Submit `createTicket` using that stable ID and original input.
 5. Record the response. If matched, process both players, establish applicable no-show deadlines, and settle if both rounds are terminal.
@@ -172,14 +175,16 @@ The same returned match contains both tickets. Processing does not depend on eit
 
 **`match.created` is deferred and optional.** If later added, its authenticated handler calls the same idempotent match-processing function. The engine does not depend on that event in this design.
 
-## 7. State ownership and settlement
+## 7. Financial ownership and automatic refunds
 
-Each entry has one document containing its accepted terms, pay-in, ticket request/status, game state/result, command acknowledgements, timer registrations and any pre-match refund. Start and cancellation compete on this document. A persisted cancellation-in-progress state prevents start while the external cancellation is being resolved; it cannot be removed without equivalent serialization.
+Before pairing, an entry document owns its stake and any refund obligation. After pairing, its match document owns the financial disposition. A completed payment is committed to the play intent; the new engine has no voluntary cancellation request or paid reservation screen.
 
-Bankroll arbitrates cancellation against matching:
+Bankroll still arbitrates automatic queue expiry against matching:
 
-- A final cancelled ticket permits the eligible entry refund.
+- A final cancelled ticket at the queue cutoff permits the entry refund, whether or not the player played.
 - A final matched ticket assigns financial disposition to its match record, even before all local projections are updated.
+
+Legacy cancellation-in-progress records continue to complete their already-accepted obligations. They are not a supported operation for new entries.
 
 Each match has one document containing immutable ticket identities, its result and its payout. The engine can create an empty match coordinator before preparing settlement. That creation alone neither decides a winner nor authorizes a transfer. The result and first watched payout attempt are committed together in this document.
 
@@ -237,7 +242,7 @@ There is one explicit terminal handling case: when automatic execution cannot sa
 
 A started round already has a genuine game-deadline timer. Finishing early does not discard that registration before terminal processing is complete. If a player request records its result and stops before completing match finalization, that existing game-deadline delivery can finish the operation. It is not replaced with a retry timer.
 
-If `start` returns an immediately finished game, it has the same requirement: establish the finalization handoff before retiring the entry's existing queue/no-show deadline registrations. Immediate completion cannot leave a persisted result with no owner for its remaining consequences.
+If the internal start transition returns an immediately finished game, it has the same requirement: establish the finalization handoff before retiring the entry's existing queue/no-show deadline registrations. Immediate completion cannot leave a persisted result with no owner for its remaining consequences.
 
 When a round finishes without an opponent, its queue-deadline timer and any later entrant's admission processing cover the remaining lifecycle. When a matched round finishes first, the other player's game/no-show event covers their unfinished play. Before clearing a finalization event, the engine must establish the applicable handoff; merely seeing `finished` or an existing match document is insufficient.
 
@@ -250,7 +255,10 @@ If a game/no-show/queue webhook encounters an operational failure during its own
 | Pay-in recorded, queue submission fails | Payment webhook fails; redelivery submits the same ticket |
 | Match committed, queue response lost | Identical ticket retry returns the match; both players are processed |
 | One player updated, processing the second fails | The originating operation remains incomplete and resumes both-side processing idempotently |
-| Start response lost | Same command returns the same challenge and clock |
+| Payment returns before webhook delivery | The client remains `starting`, waits and automatically starts after confirmation; no extra CTA or charge |
+| Start response lost | The client resumes the same entry and start identity, returning the same challenge and clock |
+| Double Play tap or reload during entry | One persisted play intent and charge key; no duplicate entry or payment sheet |
+| Voluntary cancellation sent before/after receipt delivery | Server rejects the operation; a paid play intent remains committed |
 | Final action accepted, response lost | No duplicate scoring; the command or still-actionable game-deadline delivery completes finalization |
 | Payout installed, process stops before/during send | Reference events resume payment handling according to the adapter's evidence; uncertainty is retained |
 | Timer/reference event arrives before its prepared write | It fences that preparation before acknowledgement; an expired event cannot subsequently be installed as future work |
@@ -269,8 +277,11 @@ An app binds the engine to verified sessions, its existing SDK store/treasury co
 Before implementation is accepted:
 
 - Exercise a streamed-action word game and a shooting/replay game through the same public API, including two real simulated players.
-- Test wins, ties, no-shows, queue expiry, voluntary cancellation and late payment after cancellation.
-- Test duplicate/lost commands, repeated webhooks, match/cancel and start/cancel races, immediate completion from `start`, and interruptions in the table above.
+- Test wins, ties, no-shows, queue expiry, rejection of voluntary cancellation, and late payment after automatic closure.
+- Test duplicate/lost commands, repeated webhooks, matching against queue expiry, immediate completion during automatic start, and interruptions in the table above.
+- Exercise the real client/server transport with delayed confirmation, lost start/action replies, payment-sheet dismissal, ambiguous charge results, double taps, disposal and reconnects.
+- Assert the public client view never exposes a payment quote, manual start/cancel permission or an intermediate ready state.
+- Assert the standard server dispatcher rejects cancellation before and after payment is recorded.
 - Prove that ordinary reads perform no writes, sends or lifecycle transitions.
 - Prove that only declared business deadlines create timers and that no timer changes an earned payout into a refund.
 - Test the payout adapter's actual replay/retirement guarantees, including preserved hosted uncertainty.
