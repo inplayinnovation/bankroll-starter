@@ -250,8 +250,7 @@ events use the effective deadline as `now`, even if delivery was late.
 always remains in force, and the game must return a completed result there.
 The word example scores tile paths as they arrive. The shooting example
 recomputes a bounded trajectory replay and allows three seconds for submission
-after play. A legal replay is not proof of human input; see
-[the latency guide](../../recipes/latency.md).
+after play. A legal replay is not proof of human input.
 
 Screens, animation and local simulation belong to the app. Practice may reuse
 the same rules and renderer without paid entries. Keep practice results and

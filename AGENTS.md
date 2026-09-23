@@ -148,8 +148,7 @@ confirmation and automatic start. Bind `createP2PHandler` on the server and
 render the client's snapshot; payment and start are not separate app actions.
 Paid entries are committed: no voluntary entry cancellation is exposed.
 Its timers represent queue, no-show and game deadlines. Failed webhooks use
-redelivery, never recovery timers. [recipes/latency.md](./recipes/latency.md)
-covers live inputs and replay timing.
+redelivery, never recovery timers.
 
 ## Restrictions
 

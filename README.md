@@ -106,9 +106,8 @@ locally simulated replay. Neither is wired into the starter's empty surface.
 Follow the [engine integration guide](./engine/p2p/README.md) when adding a
 game; the app no longer assembles this lifecycle from a recipe.
 
-[Timed actions and latency](./recipes/latency.md) explains input timing and
-submission windows. [notes/p2p-engine.md](./notes/p2p-engine.md) records the
-engine's design and failure behavior.
+[notes/p2p-engine.md](./notes/p2p-engine.md) records the engine's design and
+failure behavior.
 
 ## Templates
 
