@@ -1,7 +1,7 @@
 import { getSession } from '@joinbankroll/sdk/next';
 
 import { appTokens } from '@/lib/app-identity';
-import { isGeoBlocked } from '@/lib/geo';
+import { paidPlayRestriction } from '@/lib/restrictions';
 import { payeeAddress } from '@/lib/treasury';
 
 export async function GET(request: Request) {
@@ -20,8 +20,10 @@ export async function GET(request: Request) {
     // Where the user is for THIS session, not where they live. Null when the
     // host didn't report one.
     geo: session.geo ?? null,
-    // UI hint; paid-action handlers must also check the verified session's geo.
-    geoBlocked: isGeoBlocked(session.geo),
+    // The server's decision on paid play under BANKROLL_RESTRICTIONS: a null
+    // reason allows it. A UI hint; paid-action handlers must check the
+    // verified session themselves.
+    restriction: paidPlayRestriction(session),
     // Charges need a payee.
     paymentsConfigured: payeeAddress() !== null,
     // The app's own tokens, so the client can offer paying with them. Naming

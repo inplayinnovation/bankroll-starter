@@ -6,6 +6,7 @@
 // is even there, sending someone through verification — is the same in every
 // app, so it comes from @joinbankroll/sdk/react rather than living here.
 import { bankrollFetch } from '@joinbankroll/sdk/react';
+import type { Restriction } from '@joinbankroll/sdk/restrictions';
 import { useCallback, useEffect, useState } from 'react';
 
 export {
@@ -23,8 +24,11 @@ export interface Me {
   age: number | null;
   /** Where the user is for this session — not where they live. */
   geo: string | null;
-  /** The server's location decision. Keep paid actions disabled when true. */
-  geoBlocked: boolean;
+  /**
+   * The server's decision on paid play. Keep paid actions disabled while
+   * `reason` is set, and say why: the location, or the age.
+   */
+  restriction: Restriction;
   /** A payee is configured, so charges work. */
   paymentsConfigured: boolean;
   /** This app's own tokens. Empty when it issues none. */

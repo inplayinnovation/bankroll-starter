@@ -7,7 +7,12 @@ import { GET } from '@/app/api/me/route';
 vi.mock('@joinbankroll/sdk/next', () => ({ getSession: vi.fn() }));
 vi.mock('@/lib/treasury', () => ({ payeeAddress: () => 'treasury' }));
 
-beforeEach(() => vi.stubEnv('BANKROLL_GEO_BLOCKLIST', 'US,US-ME'));
+const BLOCKS_MAINE = JSON.stringify({
+  version: 1,
+  geo: { default: 'allow', countries: { US: { block: ['ME'] } } },
+});
+
+beforeEach(() => vi.stubEnv('BANKROLL_RESTRICTIONS', BLOCKS_MAINE));
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.clearAllMocks();
@@ -24,7 +29,7 @@ function session(geo?: string): BankrollSession {
   };
 }
 
-describe('/api/me geo eligibility', () => {
+describe('/api/me paid play restriction', () => {
   it('requires a verified session before reporting eligibility', async () => {
     vi.mocked(getSession).mockResolvedValue(null);
     const response = await GET(new Request('https://game.example/api/me'));
@@ -39,27 +44,29 @@ describe('/api/me geo eligibility', () => {
     }));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      username: 'tester', wallet: 'player', geo: 'US-ME', geoBlocked: true,
+      username: 'tester', wallet: 'player', geo: 'US-ME', restriction: { reason: 'location_blocked', minimumAge: 18 },
     });
   });
 
   it('reports another US state as allowed', async () => {
     vi.mocked(getSession).mockResolvedValue(session('US-CA'));
     const response = await GET(new Request('https://game.example/api/me'));
-    expect(await response.json()).toMatchObject({ geo: 'US-CA', geoBlocked: false });
+    expect(await response.json()).toMatchObject({ geo: 'US-CA', restriction: { reason: null, minimumAge: 18 } });
   });
 
   it('reports missing location as blocked while keeping session details available', async () => {
     vi.mocked(getSession).mockResolvedValue(session());
     const response = await GET(new Request('https://game.example/api/me'));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ geo: null, geoBlocked: true, username: 'tester' });
+    expect(await response.json()).toMatchObject({
+      geo: null, restriction: { reason: 'location_unknown' }, username: 'tester',
+    });
   });
 
   it('allows missing location when the restriction is disabled', async () => {
-    vi.stubEnv('BANKROLL_GEO_BLOCKLIST', '');
+    vi.stubEnv('BANKROLL_RESTRICTIONS', '');
     vi.mocked(getSession).mockResolvedValue(session());
     const response = await GET(new Request('https://game.example/api/me'));
-    expect(await response.json()).toMatchObject({ geo: null, geoBlocked: false });
+    expect(await response.json()).toMatchObject({ geo: null, restriction: { reason: null, minimumAge: null } });
   });
 });

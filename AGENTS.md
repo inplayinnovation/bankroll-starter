@@ -115,8 +115,9 @@ the balance and Play/Results tabs with empty content.
   configuration. `useMe()` in `src/lib/client/bankroll.ts` reads them.
 - `src/lib/store.ts` — the store backend this app writes documents to; see
   Storage.
-- `src/lib/geo.ts` — `isGeoBlocked(session.geo)` checks `BANKROLL_GEO_BLOCKLIST`
-  against a verified session; `/api/me` exposes `geoBlocked` for the UI.
+- `src/lib/restrictions.ts` — `paidPlayRestriction(session)` evaluates
+  `BANKROLL_RESTRICTIONS` against a verified session; `/api/me` exposes the
+  decision as `restriction` for the UI.
 - `engine/p2p/` — the headless P2P engine; its [README](./engine/p2p/README.md)
   documents `client.play()`, the game contract and standard server binding. Examples
   and tests live alongside it. The skeleton does not bind a game.
@@ -150,21 +151,23 @@ Its timers represent queue, no-show and game deadlines. Failed webhooks use
 redelivery, never recovery timers. [recipes/latency.md](./recipes/latency.md)
 covers live inputs and replay timing.
 
-## Location restrictions
+## Restrictions
 
-Set `BANKROLL_GEO_BLOCKLIST` to comma-separated location codes, for example
-`US,US-ME`. Matching is exact: this blocks country-only `US` and Maine, while
-`US-CA` passes. Whitespace and letter case are normalized. An empty or unset
-list disables the restriction; a configured list blocks missing or malformed
-location. Malformed configuration raises an error instead of allowing play.
+`BANKROLL_RESTRICTIONS` holds a JSON policy that says where, and from what
+age, this app takes real money: countries and regions that are open or
+blocked, and minimum ages by country and region. Bankroll sets it on a
+builder app. Unset means no restriction. A malformed policy raises an
+error instead of allowing play. Format and rules:
+https://docs.joinbankroll.com/build/restrictions
 
-Call `isGeoBlocked(session.geo)` on the server after `getSession(request)`
-verifies the token, before allowing paid actions. The P2P route example in
-the engine README includes this check. Use `useMe().me.geoBlocked` to explain
-the restriction and disable paid actions in the UI; wait for `me` before
-enabling them. Never authorize against a location supplied in a request body
-or a client-side decision. Webhooks must still process existing payments,
-deadlines and refunds regardless of player location.
+Call `paidPlayRestriction(session)` on the server after `getSession(request)`
+verifies the token, before allowing paid actions, and refuse while `reason`
+is set. The P2P route example in the engine README includes this check. Use
+`useMe().me.restriction` to explain the refusal and disable paid actions in
+the UI; wait for `me` before enabling them. Never decide from a location or
+an age supplied in a request body or by the client. Webhooks must still
+process existing payments, deadlines and refunds regardless of the player's
+restriction.
 
 ## Shared app UI
 
