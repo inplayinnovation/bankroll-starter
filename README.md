@@ -47,8 +47,6 @@ It moves real mainnet HSUSD. `npm run dev` creates a signing key at `~/.config/b
 
 ```bash
 npm run dev                                     # tunnel + QR — the loop you're in
-npx bankroll treasury                           # the wallet this app runs on
-npx bankroll token create --name "Promo Credit" # a token of your own
 npx bankroll --help                             # everything else
 ```
 
@@ -56,7 +54,7 @@ npx bankroll --help                             # everything else
 plain localhost server is the exception, not the loop, and it is `npx next dev`
 when you want it.
 
-`npx bankroll token create --name "Promo Credit"` mints your own token: play money that spends in your app and nowhere else, so you can exercise the whole money loop without spending real money. It lands in [`app-tokens.json`](./app-tokens.json), which is the `appTokens` claim your manifest serves.
+A token of your own — play money that spends in your app and nowhere else, so you can exercise the whole money loop without spending real money — goes in [`app-tokens.json`](./app-tokens.json), which is the `appTokens` claim your manifest serves. [App tokens](https://docs.joinbankroll.com/build/app-tokens) shows how to mint one.
 
 Platform primitives come from [`@joinbankroll/sdk`](https://www.npmjs.com/package/@joinbankroll/sdk) and [`@joinbankroll/cli`](https://www.npmjs.com/package/@joinbankroll/cli), and update with `npm update`. The local game engine described below is kept separate from app code for future SDK extraction.
 

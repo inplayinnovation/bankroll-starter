@@ -13,7 +13,7 @@ Home, Results, gameplay, and each game's result.
 
 ```bash
 npm run dev            # bankroll dev — tunnel + QR that opens the app on a phone
-npx bankroll --help    # treasury, token, and anything else
+npx bankroll --help    # login, your apps, and anything else
 npx next dev           # plain localhost, no tunnel — the exception
 npm run build          # next build
 npm test               # vitest run

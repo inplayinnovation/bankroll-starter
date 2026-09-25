@@ -36,7 +36,7 @@ export const APP_PATH = '/app';
 //
 // They live in app-tokens.json at the project root, which IS the manifest's
 // `appTokens` claim — so this file is config, not a translation layer.
-// `bankroll token create` mints one and adds it here.
+// Mint one, then add it here (docs: build/app-tokens).
 //
 // Worth nothing outside your app, which is the point: you can give away as much
 // as you like, and it can never be cashed out.
