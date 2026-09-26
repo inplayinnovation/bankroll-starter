@@ -6,8 +6,7 @@ copy of this repo, and a push to its `main` is the deploy:
 ```bash
 npm i -g @joinbankroll/cli
 bankroll login
-bankroll apps create --name "My App"
-bankroll apps clone <id>
+bankroll apps create --name "My App"    # the app, and its repo here
 ```
 
 Inside the clone, `npm run dev` prints a QR: scan it and the app opens inside
