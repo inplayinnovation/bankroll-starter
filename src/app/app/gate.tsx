@@ -11,15 +11,7 @@
 //   3. host status — outside Bankroll, or a Bankroll too old for this app
 import { useBankrollChecked, useBankrollStatus } from '@/lib/client/bankroll';
 
-export function Gate({
-  ready,
-  devTools,
-  children,
-}: {
-  ready: boolean;
-  devTools?: React.ReactNode;
-  children: React.ReactNode;
-}) {
+export function Gate({ ready, children }: { ready: boolean; children: React.ReactNode }) {
   const status = useBankrollStatus();
 
   // A server render always reads 'unavailable'. Deciding anything on that
@@ -56,14 +48,7 @@ export function Gate({
     );
   }
 
-  return (
-    <>
-      {children}
-      {/* Only reached inside the Bankroll app, which is the only place the app
-          runs and so the only place these tools have anything to say. */}
-      {devTools}
-    </>
-  );
+  return children;
 }
 
 export function Loading() {

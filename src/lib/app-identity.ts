@@ -6,8 +6,6 @@ const DEFAULT_NAME = 'Bankroll Starter';
 
 export const appName = (): string => process.env.BANKROLL_APP_NAME || DEFAULT_NAME;
 
-export const appNameConfigured = (): boolean => Boolean(process.env.BANKROLL_APP_NAME);
-
 // Where charges settle and what pays out is the treasury's business:
 // src/lib/treasury.ts.
 
