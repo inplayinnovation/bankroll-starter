@@ -188,8 +188,7 @@ the balance and Play/Results tabs with empty content.
 Platform primitives come from `@joinbankroll/sdk` and update with
 `npm update` rather than being edited here: sessions, origin, and the manifest
 route from `/next`; the treasury, charge confirmation, and payouts from
-`/server`; the store backends from `/store`; the dev overlay and host hooks from
-`/react`.
+`/server`; the store backends from `/store`; the host hooks from `/react`.
 
 ## P2P games
 
@@ -221,6 +220,21 @@ the UI; wait for `me` before enabling them. Never decide from a location or
 an age supplied in a request body or by the client. Webhooks must still
 process existing payments, deadlines and refunds regardless of the player's
 restriction.
+
+## Practice, and the review card
+
+A player who has never seen the game will not pay to learn its controls. A
+paid game here gives the same game away first: the same rules and scoring,
+as many tries as they want, said plainly on the screen to be free, and kept
+out of results, matches, and payouts. It is one screen, and it is where a new
+player's first minutes go.
+
+Bankroll draws its own review card, thumbs up or down, over the app when
+`bankroll.promptReview()` is called. The host decides how often it appears
+and keeps the answer, so the call is safe to repeat and never rejects. The
+moment worth spending it on is the end of a player's first round, not the
+load of the page; call it without awaiting, and let Bankroll draw the card
+rather than building one.
 
 ## Shared app UI
 
