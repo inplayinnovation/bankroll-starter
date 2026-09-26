@@ -45,6 +45,34 @@ In both cases:
   this repo.
 - Never create or edit files under `.github/workflows`.
 
+## Before you push
+
+A push to `main` is the deploy, so go through this list first. With the
+`origin` remote, the builder pushes when the run ends: finish the list before
+then.
+
+1. **The icon.** Put the app's icon at `public/.well-known/bankroll-icon.png`:
+   a square PNG, 512×512, bold and simple with no small text. Bankroll shows
+   it 60 pixels wide on the app's tile. Until that file exists, Bankroll shows
+   a monogram of the app's name.
+2. **The build passes:** `npm run typecheck && npm run lint && npm run build`.
+   A build that fails is not deployed.
+
+Items 1 and 2 are required. Items 3 and 4 are strong recommendations: leave
+one out only for a clear reason.
+
+3. **Free practice.** A player who has never seen the game will not pay to
+   learn its controls. A paid game gives the same game away first: the same
+   rules and scoring, as many tries as the player wants, and a plain statement
+   on the screen that it is free. Practice stays out of results, matches, and
+   payouts. It is one screen, and it is where a new player's first minutes go.
+4. **The review card.** Call `bankroll.promptReview()` at the end of a
+   player's first round, not when the page loads. Bankroll then draws its own
+   review card, thumbs up or down, over the app. The host decides how often
+   the card appears and keeps the answer, so the call is safe to repeat and
+   never rejects. Call it without awaiting it, and do not build a card of your
+   own.
+
 ## Commands
 
 ```bash
@@ -57,9 +85,6 @@ npx next dev           # laptop: the dev server on localhost (see Run it on a la
 npm run dev            # laptop: bankroll dev — tunnel + QR that opens the app on a phone
 git push bankroll main # laptop: Bankroll builds and deploys the app
 ```
-
-Run `npm run typecheck && npm run lint && npm run build` before finishing any
-change; a build that fails is not deployed.
 
 `STORE=blob npm test` runs the same suite against Vercel Blob rather than local
 files, using `DANGEROUS_BLOB_TOKEN` from `.env.test.local`. The store backends
@@ -221,21 +246,6 @@ an age supplied in a request body or by the client. Webhooks must still
 process existing payments, deadlines and refunds regardless of the player's
 restriction.
 
-## Practice, and the review card
-
-A player who has never seen the game will not pay to learn its controls. A
-paid game here gives the same game away first: the same rules and scoring,
-as many tries as they want, said plainly on the screen to be free, and kept
-out of results, matches, and payouts. It is one screen, and it is where a new
-player's first minutes go.
-
-Bankroll draws its own review card, thumbs up or down, over the app when
-`bankroll.promptReview()` is called. The host decides how often it appears
-and keeps the answer, so the call is safe to repeat and never rejects. The
-moment worth spending it on is the end of a player's first round, not the
-load of the page; call it without awaiting, and let Bankroll draw the card
-rather than building one.
-
 ## Shared app UI
 
 **Apply safe-area padding once.** Home and Results use the padded app shell.
@@ -314,12 +324,7 @@ deploys it; the app's Vercel project, wallet, and settings are Bankroll's.
 The app uses no external images, fonts, scripts, or APIs that need an account
 or a key.
 
-## The icon and the name
-
-Put the app's icon at `public/.well-known/bankroll-icon.png`: a square PNG,
-512×512, bold and simple with no small text, because Bankroll shows it at 60
-pixels wide on the app's tile. Until that file exists, Bankroll shows a
-monogram of the app's name.
+## The name
 
 The name is set once, by `bankroll apps create --name`; a push does not
 change it. `bankroll-app.json` is read only by Bankroll's builder, in its own
