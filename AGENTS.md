@@ -103,9 +103,11 @@ injected, so the client SDK reports `ready`, `session()` answers as `@tester`
 with a verified identity, and `charge()` completes with a made-up signature the
 server accepts. It fails on any console error, page error, or failed request,
 and writes screenshots to `checks/`. Look at them. Pass `--owner` to test
-screens you add for the app's owner. A plain desktop browser has no host, so
-`/app` shows "Open this in Bankroll" there; `npm run check` is how an agent sees
-the app.
+screens you add for the app's owner. Under `BANKROLL_MOCK=1` the app also
+puts the stand-in host on its own page (`src/app/app/mock-host.tsx`), so
+`http://localhost:3000/app` runs in any browser, yours or an agent's, as the
+pretend user; without the flag a browser has no host and `/app` shows "Open
+this in Bankroll".
 
 **On a phone:** `npm run dev` runs the dev server behind a public tunnel and
 prints a QR that opens the app inside Bankroll, with real sessions and real
