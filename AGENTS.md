@@ -4,24 +4,62 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind v4. A skeleton for
 Bankroll apps. The host holds the player's wallet and provides identity and
 location. Build your screens, state, and payment flows here.
 
-Platform docs: https://docs.joinbankroll.com/llms-full.txt
+Read the platform docs before you write a Bankroll SDK call, and go back to
+them when unsure: https://docs.joinbankroll.com/llms-full.txt has every page
+in one file; the index is https://docs.joinbankroll.com/llms.txt, and any page
+is markdown with `.md` added to its address. The SDK is pre-1.0 and minor
+versions carry breaking changes, so check the installed version against the
+changelog page rather than writing calls from memory. In Bankroll's builder the
+same file is at `../builder/bankroll-docs.md`.
 
 [anatomy.md](./anatomy.md) describes the suggested screen layout and flow:
 Home, Results, gameplay, and each game's result.
 
+## How this app reaches Bankroll
+
+Bankroll owns this app's deployment. **A commit that reaches this repo's
+`main` is the deploy:** Bankroll reads the code, classifies what the app does
+(free, paid, prizes; that sets where it may take money), signs its manifest,
+and deploys it. A build takes a minute or two. The commit message is what the
+owner reads as the run's text in their Bankroll app, so make it plain and
+about the change.
+
+Check `git remote -v` before you touch git:
+
+- **A remote named `bankroll`** is a laptop clone. You push yourself:
+  `git push bankroll main`. A failed build sends the owner a push
+  notification. The Bankroll CLI shows the run's state, the app's address,
+  and publishes the app; the `bankroll` skill teaches an agent all of it:
+  `npx skills add inplayinnovation/bankroll-cli --skill bankroll -g`.
+- **A remote named `origin`** is Bankroll's own builder. Do not commit or
+  push: the builder commits and pushes when the run ends. Its rules file says
+  what else is different there.
+
+In both cases:
+
+- Do not deploy this app yourself: no `vercel link`, no `vercel deploy`, and
+  `vercel.json` keeps `git.deploymentEnabled: false`, so only Bankroll's build
+  deploys a push.
+- The deployment's wallet, manifest, webhook secret, and restrictions are
+  settings Bankroll puts on the project. Nothing about money or keys goes in
+  this repo.
+- Never create or edit files under `.github/workflows`.
+
 ## Commands
 
 ```bash
-npm run dev            # bankroll dev — tunnel + QR that opens the app on a phone
-npx bankroll --help    # login, your apps, and anything else
-npx next dev           # plain localhost, no tunnel — the exception
+npm run check -- /app  # the app in a headless phone with a stand-in host
 npm run build          # next build
 npm test               # vitest run
 npm run typecheck      # tsc --noEmit
 npm run lint           # eslint
+npx next dev           # laptop: the dev server on localhost (see Run it on a laptop)
+npm run dev            # laptop: bankroll dev — tunnel + QR that opens the app on a phone
+git push bankroll main # laptop: Bankroll builds and deploys the app
 ```
 
-Run `npm run typecheck && npm run lint` before finishing any change.
+Run `npm run typecheck && npm run lint && npm run build` before finishing any
+change; a build that fails is not deployed.
 
 `STORE=blob npm test` runs the same suite against Vercel Blob rather than local
 files, using `DANGEROUS_BLOB_TOKEN` from `.env.test.local`. The store backends
@@ -30,11 +68,32 @@ themselves are the SDK's, and their cross-backend contract is tested there.
 from any real Blob store; if it fails, stop rather than let a fixture delete
 real data.
 
-## Testing without a phone
+## Run it on a laptop
+
+With the `origin` remote, Bankroll's builder, the dev server is already
+running with the app's settings; skip this. On a laptop, look for
+`.env.development` at the project root: Bankroll writes it when it creates
+an app, with `STORE=fs`, `BANKROLL_MOCK=1`, and the app's name, payee, owner,
+and wallet id, and `next dev` reads it. An older app has none; give it the
+three settings that matter in `.env.local`:
 
 ```bash
-BANKROLL_MOCK=1 npx next dev      # or put BANKROLL_MOCK=1 in .env.local
-npm run check -- /app             # headless phone-sized Chromium, fake host
+cat > .env.local <<'EOF'
+STORE=fs
+BANKROLL_MOCK=1
+BANKROLL_APP_NAME=<the app's name>
+EOF
+```
+
+`STORE=fs` keeps documents in files under `bankroll/development/`; without it
+the store is Vercel Blob, which needs a token the deployment has and your
+machine does not. `BANKROLL_MOCK=1` makes the server accept a stand-in host:
+its token, its made-up charge signatures, and simulated payouts, so no money
+moves and no key is needed. Production builds ignore both files.
+
+```bash
+npx next dev                      # the dev server, on localhost
+npm run check -- /app             # headless phone-sized Chromium, stand-in host
 npm run check -- /app '/app?tab=results' / # both tabs and the public site
 npm run check -- --admin-probe    # only the player probe of /api/admin (also runs after every check)
 ```
@@ -43,32 +102,25 @@ npm run check -- --admin-probe    # only the player probe of /api/admin (also ru
 injected, so the client SDK reports `ready`, `session()` answers as `@tester`
 with a verified identity, and `charge()` completes with a made-up signature the
 server accepts. It fails on any console error, page error, or failed request,
-and writes screenshots to `checks/`. Look at them. Real money moves only inside
-the Bankroll app; the flag is ignored in production builds.
+and writes screenshots to `checks/`. Look at them. Pass `--owner` to test
+screens you add for the app's owner. A plain desktop browser has no host, so
+`/app` shows "Open this in Bankroll" there; `npm run check` is how an agent sees
+the app.
 
-Pass `--owner` to test screens you add for the app's owner.
-
-## Setup (local)
-
-**Local development needs nothing.** `npm create @joinbankroll/app` writes
-`.env.local` — `STORE=fs`, the app name, and an RPC. `npm run dev` takes it from
-there: a tunnel, and a QR that opens the app on a phone.
-
-The key that receives payments and signs payouts lives at
-`~/.config/bankroll/keypair.json`, created on first use and injected into the
-dev server rather than written into the project, so it cannot be committed. It
-moves real mainnet HSUSD — fund it with only what you need to test.
-
-The tunnel gets a **new URL on every restart**, so the host can't reopen a
-previous one: scan the new QR after each start. "Can't open this app" almost
-always means a dead tunnel.
+**On a phone:** `npm run dev` runs the dev server behind a public tunnel and
+prints a QR that opens the app inside Bankroll, with real sessions and real
+charges. It supplies a signing key from `~/.config/bankroll/keypair.json` as
+the payee, created on first use and never written into the project. Leave
+`BANKROLL_MOCK` out of `.env.local` for that loop: with it set, charges are
+real and payouts are simulated. The tunnel gets a **new URL on every
+restart**, so the host can't reopen a previous one: scan the new QR after each
+start. "Can't open this app" almost always means a dead tunnel.
 
 If you are an agent: run `npm run dev` as a background task — its output, the
 QR included, is never shown to the user. Put the QR **in your chat reply** as
 plain monospace glyphs in a fenced code block, the play link under it;
-`bankroll dev` prints exactly that when stdout is not a TTY (CLI 0.3+, and
-https://docs.joinbankroll.com/build/agents.md carries the rebuild recipe for
-older CLIs). Never relay the ANSI QR from a TTY run — its contrast is in the
+`bankroll dev` prints exactly that when stdout is not a TTY, so re-print it
+verbatim. Never relay the ANSI QR from a TTY run — its contrast is in the
 color codes, so chat strips it to a wall of `▀` — and never send the QR as an
 image file or attachment; neither renders in a terminal chat.
 
@@ -227,68 +279,35 @@ transactions across documents.
 
 ## Deploy
 
-To your own Vercel — never hosted by Bankroll. `.env.local` is gitignored, so
-`STORE=fs` and the dev treasury never reach the deployment; with no `STORE`,
-production uses Blob.
-
-```bash
-npx vercel link                                    # create/connect the project
-npx vercel blob create-store <name>                # injects BLOB_READ_WRITE_TOKEN into the deploy
-npx vercel env add BANKROLL_APP_NAME production     # --value <name>, or stdin
-npx vercel deploy --prod
-```
-
-Connecting the Blob store injects its token into the deployment automatically —
-do **not** `vercel env pull` it into `.env.local` (that overwrites your dev
-setup). `vercel env add <KEY> <env>` targets one environment, `--force`
-overwrites; Production/Preview vars are sensitive by default (unreadable after),
-Development rejects sensitive values. Users open the app at
-`https://joinbankroll.com/play?url=<url-encoded origin>/app`.
-
-### The production treasury key
-
-Reusing the dev key — `~/.config/bankroll/keypair.json` — is fine to get
-production started: dev and production become one treasury wallet, funded
-once. It is not a long-term setup. For real production use, either generate a
-fresh keypair and custody a copy of the secret securely (a sensitive variable
-cannot be read back, so that copy is the only recovery), or hold the treasury
-key in a service built for it, like Privy or Turnkey. Either command below
-writes the secret to stdout (piped, never shown) and the public address to
-stderr (shown, so you know which wallet to fund).
-
-```bash
-# get started: reuse the dev treasury
-node -e "const bs58=require('bs58').default,{readFileSync}=require('fs'),{homedir}=require('os');const k=Uint8Array.from(JSON.parse(readFileSync(homedir()+'/.config/bankroll/keypair.json','utf8')));console.error('treasury:',bs58.encode(k.subarray(32)));process.stdout.write(bs58.encode(k))" \
-  | npx vercel env add BANKROLL_TREASURY_KEY production --sensitive
-
-# or generate a fresh production key
-node -e "const{generateKeyPairSync}=require('crypto'),bs58=require('bs58').default;const{publicKey,privateKey}=generateKeyPairSync('ed25519');const a=publicKey.export({format:'der',type:'spki'}).subarray(-32),s=privateKey.export({format:'der',type:'pkcs8'}).subarray(-32);console.error('treasury:',bs58.encode(a));process.stdout.write(bs58.encode(Buffer.concat([s,a])))" \
-  | npx vercel env add BANKROLL_TREASURY_KEY production --sensitive
-```
-
-### The RPC
-
-`SOLANA_RPC_URL` can start unset — the SDK falls back to the public Solana
-endpoint, which is rate-limited and shared. Before real traffic, set it to a
-dedicated RPC (e.g. one from https://www.helius.dev):
-
-```bash
-npx vercel env add SOLANA_RPC_URL production
-```
-
-## STOP: never replace a funded treasury
-
-If `BANKROLL_TREASURY_KEY` is already set (`npx vercel env ls`), do not replace
-it without asking — swapping the variable strands the balance, it does not move
-it. Replacing a funded treasury means: create the new key, move the old wallet's
-entire balance to the new address, then swap. A sensitive variable's value is
-shown once, at creation, never again.
+A push to `main`, as described at the top. Bankroll builds, signs, and
+deploys it; the app's Vercel project, wallet, and settings are Bankroll's.
 
 ## Do not edit
 
-`src/app/.well-known/bankroll.jwt/route.ts` — the manifest derives origin,
-payment address, name, and icon at runtime. Serving it is what makes this a
-Bankroll app; there is no registration step and no signing key.
+- `src/app/.well-known/**` — the manifest route derives origin, payment
+  address, name, and icon at runtime, and serves the version Bankroll signed
+  at the last build. Serving it is what makes this a Bankroll app.
+- `src/lib/store.ts` and `src/lib/treasury.ts` — the storage and money
+  adapters. The payee and the owner are settings, never values in code.
+- `engine/p2p/**`, `scripts/**`, and `app-tokens.json` — the engine, the
+  checks, and the token declaration. Bind the engine and declare tokens;
+  do not rewrite them.
+- `vercel.json` keeps `git.deploymentEnabled: false`, and nothing is created
+  or edited under `.github/workflows`.
+
+The app uses no external images, fonts, scripts, or APIs that need an account
+or a key.
+
+## The icon and the name
+
+Put the app's icon at `public/.well-known/bankroll-icon.png`: a square PNG,
+512×512, bold and simple with no small text, because Bankroll shows it at 60
+pixels wide on the app's tile. Until that file exists, Bankroll shows a
+monogram of the app's name.
+
+The name is set once, by `bankroll apps create --name`; a push does not
+change it. `bankroll-app.json` is read only by Bankroll's builder, in its own
+sandbox, so writing it in a laptop clone does nothing.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

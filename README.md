@@ -1,20 +1,22 @@
 # Bankroll Starter
 
-A Bankroll app skeleton, running on your phone, in three commands.
+A Bankroll app skeleton. Every app made with the Bankroll CLI starts as a
+copy of this repo, and a push to its `main` is the deploy:
 
 ```bash
-npm create @joinbankroll/app@latest my-app
-cd my-app
-npm run dev
+npm i -g @joinbankroll/cli
+bankroll login
+bankroll apps create --name "My App"
+bankroll apps clone <id>
 ```
 
-`npm run dev` prints a QR. Scan it: your app opens inside Bankroll, with hot reload.
-
-No account. No signup. No API key. Nothing to register.
+Inside the clone, `npm run dev` prints a QR: scan it and the app opens inside
+Bankroll on your phone, with hot reload. `git push bankroll main` builds and
+deploys it.
 
 Building with a coding agent? Start at
 [Build with an agent](https://docs.joinbankroll.com/build/agents) — it walks
-the whole setup, from an empty folder to the QR on your phone.
+the whole setup, from the CLI to the first push.
 
 ## The hard parts are already done
 
@@ -47,6 +49,7 @@ It moves real mainnet HSUSD. `npm run dev` creates a signing key at `~/.config/b
 
 ```bash
 npm run dev                                     # tunnel + QR — the loop you're in
+git push bankroll main                          # a Bankroll-built app: Bankroll builds and deploys it
 npx bankroll --help                             # everything else
 ```
 
@@ -107,20 +110,16 @@ game; the app no longer assembles this lifecycle from a recipe.
 [notes/p2p-engine.md](./notes/p2p-engine.md) records the engine's design and
 failure behavior.
 
-## Templates
+## Reference apps
 
-Every branch of this repo is a template — `main` is the skeleton, and each
-branch is a reference app built on it. Scaffold one with:
-
-```bash
-npm create @joinbankroll/app@latest my-app -- --template demo
-```
+`main` is the skeleton every app starts from. Other branches are reference
+apps built on it, to read:
 
 - [`demo`](../../tree/demo) — the verified session, a one-cent charge, and
   paying the same cent back on one screen.
 
 ## Links
 
-[Docs](https://docs.joinbankroll.com/build/overview) · [Quickstart](https://docs.joinbankroll.com/build/quickstart) · [Payments](https://docs.joinbankroll.com/build/payments) · [Payouts](https://docs.joinbankroll.com/build/payouts) · [SDK](https://www.npmjs.com/package/@joinbankroll/sdk) · [CLI](https://www.npmjs.com/package/@joinbankroll/cli)
+[Docs](https://docs.joinbankroll.com/build/quickstart) · [Quickstart](https://docs.joinbankroll.com/build/quickstart) · [Payments](https://docs.joinbankroll.com/build/payments) · [Payouts](https://docs.joinbankroll.com/build/payouts) · [SDK](https://www.npmjs.com/package/@joinbankroll/sdk) · [CLI](https://www.npmjs.com/package/@joinbankroll/cli)
 
 MIT — see [LICENSE](./LICENSE).
