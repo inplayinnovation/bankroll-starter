@@ -1,10 +1,19 @@
 // How your app introduces itself: the name Bankroll shows when someone
-// connects it. Deployment config rather than source, so a fork never edits the
-// manifest route — and preview and production can differ. (Your icon is a
-// file, not config: public/.well-known/bankroll-icon.png.)
-const DEFAULT_NAME = 'Bankroll Starter';
+// connects it. It lives in bankroll-app.json at the project root, which IS
+// what Bankroll signs into the manifest — it reads that file in the commit it
+// builds, so this file is config, not a translation layer. A fork inherits it
+// and then changes it. (Your icon is a file too:
+// public/.well-known/bankroll-icon.png.)
+//
+// The name below stands in until you declare one, on this app's own pages and
+// in the manifest it serves before Bankroll has signed one. An app that
+// declares no name is known by its address.
+import declaration from '../../bankroll-app.json';
 
-export const appName = (): string => process.env.BANKROLL_APP_NAME || DEFAULT_NAME;
+const DEFAULT_NAME = 'Bankroll Starter';
+const declared: { name?: string } = declaration;
+
+export const appName = (): string => declared.name?.trim() || DEFAULT_NAME;
 
 // Where charges settle and what pays out is the treasury's business:
 // src/lib/treasury.ts.

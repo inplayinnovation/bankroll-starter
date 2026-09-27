@@ -51,22 +51,30 @@ A push to `main` is the deploy, so go through this list first. With the
 `origin` remote, the builder pushes when the run ends: finish the list before
 then.
 
-1. **The icon.** Put the app's icon at `public/.well-known/bankroll-icon.png`:
-   a square PNG, 512×512, bold and simple with no small text. Bankroll shows
-   it 60 pixels wide on the app's tile. Until that file exists, Bankroll shows
-   a monogram of the app's name.
-2. **The build passes:** `npm run typecheck && npm run lint && npm run build`.
+1. **The name.** Put the app's name in `bankroll-app.json` at the project
+   root: `{ "name": "Free Throw Duel" }`. Take it from what the app really is,
+   and keep it short enough to read on a tile. Bankroll reads that file in the
+   commit it builds and signs the name into the app's manifest, and the
+   manifest is what a player sees. Nothing else names the app.
+2. **The icon.** Put the app's icon at `public/.well-known/bankroll-icon.png`:
+   a square PNG, 512×512, bold and simple with no small text, because Bankroll
+   shows it 60 pixels wide on the app's tile. Make it the best way you can: if
+   you can produce images, generate it directly; otherwise call an image model,
+   or draw it in code, for example on a canvas in a headless browser, and take
+   a screenshot. Until that file exists, Bankroll shows a monogram of the app's
+   name.
+3. **The build passes:** `npm run typecheck && npm run lint && npm run build`.
    A build that fails is not deployed.
 
-Items 1 and 2 are required. Items 3 and 4 are strong recommendations: leave
+Items 1 to 3 are required. Items 4 and 5 are strong recommendations: leave
 one out only for a clear reason.
 
-3. **Free practice.** A player who has never seen the game will not pay to
+4. **Free practice.** A player who has never seen the game will not pay to
    learn its controls. A paid game gives the same game away first: the same
    rules and scoring, as many tries as the player wants, and a plain statement
    on the screen that it is free. Practice stays out of results, matches, and
    payouts. It is one screen, and it is where a new player's first minutes go.
-4. **The review card.** Call `bankroll.promptReview()` at the end of a
+5. **The review card.** Call `bankroll.promptReview()` at the end of a
    player's first round, not when the page loads. Bankroll then draws its own
    review card, thumbs up or down, over the app. The host decides how often
    the card appears and keeps the answer, so the call is safe to repeat and
@@ -98,15 +106,14 @@ real data.
 With the `origin` remote, Bankroll's builder, the dev server is already
 running with the app's settings; skip this. On a laptop, look for
 `.env.development` at the project root: Bankroll writes it when it creates
-an app, with `STORE=fs`, `BANKROLL_MOCK=1`, and the app's name, payee, owner,
-and wallet id, and `next dev` reads it. An older app has none; give it the
-three settings that matter in `.env.local`:
+an app, with `STORE=fs`, `BANKROLL_MOCK=1`, and the app's payee, owner, and
+wallet id, and `next dev` reads it. An older app has none; give it the two
+settings that matter in `.env.local`:
 
 ```bash
 cat > .env.local <<'EOF'
 STORE=fs
 BANKROLL_MOCK=1
-BANKROLL_APP_NAME=<the app's name>
 EOF
 ```
 
@@ -312,7 +319,8 @@ deploys it; the app's Vercel project, wallet, and settings are Bankroll's.
 
 - `src/app/.well-known/**` — the manifest route derives origin, payment
   address, name, and icon at runtime, and serves the version Bankroll signed
-  at the last build. Serving it is what makes this a Bankroll app.
+  at the last build. Serving it is what makes this a Bankroll app. Declare the
+  name in `bankroll-app.json`, not here.
 - `src/lib/store.ts` and `src/lib/treasury.ts` — the storage and money
   adapters. The payee and the owner are settings, never values in code.
 - `engine/p2p/**`, `scripts/**`, and `app-tokens.json` — the engine, the
