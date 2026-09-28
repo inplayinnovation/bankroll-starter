@@ -130,6 +130,10 @@ npm run check -- /app '/app?tab=results' / # both tabs and the public site
 npm run check -- --admin-probe    # only the player probe of /api/admin (also runs after every check)
 ```
 
+On your own machine, run `npx playwright install chromium` once before the
+first check: npm installs Playwright but not the browser it drives. Bankroll's
+builder sandboxes do this for you.
+
 `npm run check` loads each path with `@joinbankroll/sdk/mock`'s stand-in host
 injected, so the client SDK reports `ready`, `session()` answers as `@tester`
 with a verified identity, and `charge()` completes with a made-up signature the
