@@ -214,12 +214,14 @@ the balance and Play/Results tabs with empty content.
 - `src/app/api/bankroll/webhook/route.ts` — where Bankroll reports references
   and deadlines; bind the configured engine's `webhook` handlers here.
 - `src/lib/treasury.ts` — the payee, owner, and payout signer configuration.
-- `src/lib/app-identity.ts` — how the app introduces itself in the manifest:
-  its name, where it boots, the tokens it issues, and `BANKROLL_SUPPORT_URL`,
-  which puts a "Help with <app>" item in Bankroll's own menu. Any URL works —
-  a help page, `mailto:`, `tel:`, a chat invite — and it opens outside the app.
-  Changing it later re-asks every existing user for consent, so point it at
-  something durable.
+- `bankroll-app.json` — everything the app says about itself, and what Bankroll
+  signs into its manifest: `name`, `appTokens` (the tokens it issues), and
+  `supportUrl`, which puts a "Help with <app>" item in Bankroll's own menu. Any
+  URL works there — a help page, `mailto:`, `tel:`, a chat invite — and it opens
+  outside the app. Changing a claim later re-asks every existing user for
+  consent, so point the URL at something durable.
+- `src/lib/app-identity.ts` — reads that file, and holds the one claim that is
+  not in it: where the app boots.
 
 Platform primitives come from `@joinbankroll/sdk` and update with
 `npm update` rather than being edited here: sessions, origin, and the manifest
@@ -327,9 +329,8 @@ deploys it; the app's Vercel project, wallet, and settings are Bankroll's.
   name in `bankroll-app.json`, not here.
 - `src/lib/store.ts` and `src/lib/treasury.ts` — the storage and money
   adapters. The payee and the owner are settings, never values in code.
-- `engine/p2p/**`, `scripts/**`, and `app-tokens.json` — the engine, the
-  checks, and the token declaration. Bind the engine and declare tokens;
-  do not rewrite them.
+- `engine/p2p/**` and `scripts/**` — the engine and the checks. Bind the
+  engine; do not rewrite either.
 - `vercel.json` keeps `git.deploymentEnabled: false`, and nothing is created
   or edited under `.github/workflows`.
 
