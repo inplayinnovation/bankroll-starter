@@ -337,12 +337,6 @@ deploys it; the app's Vercel project, wallet, and settings are Bankroll's.
 The app uses no external images, fonts, scripts, or APIs that need an account
 or a key.
 
-## The name
-
-The name is set once, by `bankroll apps create --name`; a push does not
-change it. `bankroll-app.json` is read only by Bankroll's builder, in its own
-sandbox, so writing it in a laptop clone does nothing.
-
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
