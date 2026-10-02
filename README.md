@@ -1,7 +1,8 @@
 # Bankroll Starter
 
 A Bankroll app skeleton. Every app made with the Bankroll CLI starts as a
-copy of this repo, and a push to its `main` is the deploy:
+copy of this repo. A push to its `main` builds the test version, and a push
+to `live` publishes it:
 
 ```bash
 npm i -g @joinbankroll/cli
@@ -10,8 +11,8 @@ bankroll apps create                    # the app, and its repo here
 ```
 
 Inside the clone, `npm run dev` prints a QR: scan it and the app opens inside
-Bankroll on your phone, with hot reload. `git push bankroll main` builds and
-deploys it.
+Bankroll on your phone, with hot reload. `git push bankroll main` builds the
+test version; `git push bankroll main:live` publishes it.
 
 Building with a coding agent? Start at
 [Build with an agent](https://docs.joinbankroll.com/build/agents) — it walks
@@ -48,7 +49,8 @@ It moves real mainnet HSUSD. `npm run dev` creates a signing key at `~/.config/b
 
 ```bash
 npm run dev                                     # tunnel + QR — the loop you're in
-git push bankroll main                          # a Bankroll-built app: Bankroll builds and deploys it
+git push bankroll main                          # a Bankroll-built app: Bankroll builds the test version
+git push bankroll main:live                     # publishes it
 npx bankroll --help                             # everything else
 ```
 

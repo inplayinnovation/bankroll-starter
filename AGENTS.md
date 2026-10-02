@@ -26,10 +26,12 @@ about the change.
 
 Check `git remote -v` before you touch git:
 
-- **A remote named `bankroll`** is a laptop clone. You push yourself:
-  `git push bankroll main`. A failed build sends the owner a push
-  notification. The Bankroll CLI shows the run's state, the app's address,
-  and publishes the app; the `bankroll` skill teaches an agent all of it:
+- **A remote named `bankroll`** is a laptop clone. You push yourself.
+  `git push bankroll main` builds the test version, paid in test cash;
+  `git push bankroll main:live` publishes it. `bankroll wait test` and
+  `bankroll wait live` show the build and the address. A failed build sends
+  the owner a push notification. The `bankroll` skill teaches an agent all
+  of it:
   `npx skills add inplayinnovation/bankroll-cli --skill bankroll -g`.
 - **A remote named `origin`** is Bankroll's own builder. Do not commit or
   push: the builder commits and pushes when the run ends. Its rules file says
@@ -47,7 +49,8 @@ In both cases:
 
 ## Before you push
 
-A push to `main` is the deploy, so go through this list first. With the
+A push to `main` builds the test version and a push to `live` publishes it,
+so go through this list first. With the
 `origin` remote, the builder pushes when the run ends: finish the list before
 then.
 
@@ -91,7 +94,8 @@ npm run typecheck      # tsc --noEmit
 npm run lint           # eslint
 npx next dev           # laptop: the dev server on localhost (see Run it on a laptop)
 npm run dev            # laptop: bankroll dev — tunnel + QR that opens the app on a phone
-git push bankroll main # laptop: Bankroll builds and deploys the app
+git push bankroll main # laptop: Bankroll builds the test version
+git push bankroll main:live # laptop: publishes the test version
 ```
 
 `STORE=blob npm test` runs the same suite against Vercel Blob rather than local
@@ -327,8 +331,9 @@ transactions across documents.
 
 ## Deploy
 
-A push to `main`, as described at the top. Bankroll builds, signs, and
-deploys it; the app's Vercel project, wallet, and settings are Bankroll's.
+A push to `main`, as described at the top, builds the test version; a push
+to `live` publishes it. Bankroll builds, signs, and deploys both; the app's
+Vercel project, wallet, and settings are Bankroll's.
 
 ## Do not edit
 
