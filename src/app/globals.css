@@ -16,12 +16,17 @@ body {
 
    This only works together with viewport-fit=cover in the layout's viewport
    export: without it every env(safe-area-inset-*) resolves to zero and this
-   silently becomes ordinary padding. */
+   silently becomes ordinary padding.
+
+   A browser on a computer has no insets of its own, so in the simulator
+   (npm run dev -- --simulator) the stand-in host sets the simulated phone's as
+   --bankroll-safe-area-inset-*. They come first here, and the phone's own
+   value is what is used wherever they are not set. */
 .app-shell {
-  padding-top: max(2.5rem, env(safe-area-inset-top));
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  padding-left: max(1.25rem, env(safe-area-inset-left));
-  padding-right: max(1.25rem, env(safe-area-inset-right));
+  padding-top: max(2.5rem, var(--bankroll-safe-area-inset-top, env(safe-area-inset-top)));
+  padding-bottom: max(0.75rem, var(--bankroll-safe-area-inset-bottom, env(safe-area-inset-bottom)));
+  padding-left: max(1.25rem, var(--bankroll-safe-area-inset-left, env(safe-area-inset-left)));
+  padding-right: max(1.25rem, var(--bankroll-safe-area-inset-right, env(safe-area-inset-right)));
 }
 
 .btn {

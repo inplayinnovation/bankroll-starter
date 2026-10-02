@@ -269,9 +269,18 @@ spacing (2.5rem top, 0.75rem bottom, 1.25rem horizontally). Keep the header and
 surface inside that shell without adding a second inset. For full-bleed
 gameplay, let the scene fill the viewport and apply safe-area padding once to
 its HUD and controls, rather than enclosing the whole scene in the padded
-shell; see [anatomy.md](./anatomy.md). A phone-sized browser viewport alone does
-not simulate a notch; check on a device or override the browser's safe-area
-insets when checking layout.
+shell; see [anatomy.md](./anatomy.md).
+
+**Read an inset through Bankroll's variable.** Wherever CSS needs a device
+inset, write `var(--bankroll-safe-area-inset-top, env(safe-area-inset-top))`,
+and the same for `right`, `bottom` and `left`, as `.app-shell` does. A browser
+on a computer reports every `env(safe-area-inset-*)` as zero, so a phone-sized
+viewport alone does not simulate a notch. The simulator
+(`npm run dev -- --simulator`) draws the phone's status bar and home indicator
+over the app, and the stand-in host (`@joinbankroll/sdk` 0.33.0 on) sets those
+variables to the simulated phone's insets. On a phone they are not set, and the
+device's own value is used. A bare `env()` is right on a phone and sits under
+the status bar in the simulator.
 
 **The surface owns its header.** `home.tsx` renders `BankrollBalances` at the
 top right inside `Gate`. Keeping the header with the surface lets gameplay
