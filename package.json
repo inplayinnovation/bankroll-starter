@@ -5,6 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "bankroll dev",
+    "phone": "bankroll dev --phone",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
@@ -21,7 +22,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@joinbankroll/cli": "^0.4.0",
+    "@joinbankroll/cli": "^0.6.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",

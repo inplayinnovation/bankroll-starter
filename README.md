@@ -10,9 +10,11 @@ bankroll login
 bankroll apps create                    # the app, and its repo here
 ```
 
-Inside the clone, `npm run dev` prints a QR: scan it and the app opens inside
-Bankroll on your phone, with hot reload. `git push bankroll main` builds the
-test version; `git push bankroll main:live` publishes it.
+Inside the clone, `npm run dev` opens the app in the simulator: a phone on
+your screen, shown to a pretend user who pays fake dollars on a local chain,
+with hot reload. `npm run phone` prints a QR instead: scan it and the app opens
+inside Bankroll on your phone, with real money. `git push bankroll main` builds
+the test version; `git push bankroll main:live` publishes it.
 
 Building with a coding agent? Start at
 [Build with an agent](https://docs.joinbankroll.com/build/agents) — it walks
@@ -43,20 +45,22 @@ of with its own key through Bankroll (`src/lib/treasury.ts` explains the
 variables). And `npm run check` drives the app in a headless browser with a
 stand-in host, so a coding agent or CI can test it without a phone.
 
-It moves real mainnet HSUSD. `npm run dev` creates a signing key at `~/.config/bankroll/keypair.json` on first use and hands it to the dev server — it is never written into your project, so it cannot be committed. That key receives payments and signs payouts, so fund it with only what you want to risk, and give a deployment its own.
+It moves real mainnet HSUSD. `npm run phone` creates a signing key at `~/.config/bankroll/keypair.json` on first use and hands it to the dev server — it is never written into your project, so it cannot be committed. That key receives payments and signs payouts, so fund it with only what you want to risk, and give a deployment its own. The simulator never touches it: there the app's treasury is a key made up for the purpose, and the money is fake.
 
 ## Commands
 
 ```bash
-npm run dev                                     # tunnel + QR — the loop you're in
+npm run dev                                     # the simulator: the app in a phone on this computer
+npm run phone                                   # tunnel + QR — the app on your phone, real money
 git push bankroll main                          # a Bankroll-built app: Bankroll builds the test version
 git push bankroll main:live                     # publishes it
 npx bankroll --help                             # everything else
 ```
 
-`npm run dev` is `bankroll dev`, because the app only runs inside Bankroll — a
-plain localhost server is the exception, not the loop, and it is `npx next dev`
-when you want it.
+`npm run dev` is `bankroll dev`, because the app only runs inside a Bankroll
+host: the simulator on your computer, or the Bankroll app on a phone
+(`npm run phone`). A plain localhost server is the exception, not the loop,
+and it is `npx next dev` when you want it.
 
 A token of your own — play money that spends in your app and nowhere else, so you can exercise the whole money loop without spending real money — goes under `appTokens` in [`bankroll-app.json`](./bankroll-app.json), the file that holds every claim your manifest makes about your app. [App tokens](https://docs.joinbankroll.com/build/app-tokens) shows how to mint one.
 
