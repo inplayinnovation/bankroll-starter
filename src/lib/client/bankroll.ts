@@ -5,10 +5,20 @@
 // Talking to the host — attaching the session token, knowing whether Bankroll
 // is even there, sending someone through verification — is the same in every
 // app, so it comes from @joinbankroll/sdk/react rather than living here.
+//
+// The SDK is started here, once, as this module loads: every call but
+// status() waits for init(), and one made without it rejects with
+// not_initialized. Client code imports `bankroll` and the hooks from this
+// module and never from the SDK directly, so wherever the SDK is used, it has
+// been started.
+import { bankroll } from '@joinbankroll/sdk';
 import { bankrollFetch } from '@joinbankroll/sdk/react';
 import type { Restriction } from '@joinbankroll/sdk/restrictions';
 import { useCallback, useEffect, useState } from 'react';
 
+bankroll.init();
+
+export { bankroll };
 export {
   bankrollFetch,
   useBankrollChecked,

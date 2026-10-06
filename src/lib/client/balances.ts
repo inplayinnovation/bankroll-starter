@@ -1,7 +1,9 @@
 'use client';
 
-import { bankroll, BankrollError, type Balances } from '@joinbankroll/sdk';
+import { BankrollError, type Balances } from '@joinbankroll/sdk';
 import { useEffect, useState } from 'react';
+
+import { bankroll } from '@/lib/client/bankroll';
 
 const REFRESH_MS = 2_000;
 

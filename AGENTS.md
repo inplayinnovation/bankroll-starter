@@ -144,10 +144,12 @@ with a verified identity, and `charge()` completes with a made-up signature the
 server accepts. It fails on any console error, page error, or failed request,
 and writes screenshots to `checks/`. Look at them. Pass `--owner` to test
 screens you add for the app's owner. Under `BANKROLL_MOCK=1` the app also
-puts the stand-in host on its own page (`src/app/app/mock-host.tsx`), so
-`http://localhost:3000/app` runs in any browser, yours or an agent's, as the
-pretend user; without the flag a browser has no host and `/app` shows "Open
-this in Bankroll".
+puts the stand-in host on its own page (`MockHost` from `@joinbankroll/sdk/next`,
+in `src/app/app/layout.tsx`), so `http://localhost:3000/app` runs in any
+browser, yours or an agent's, as the pretend user; without the flag a browser
+has no host and `/app` shows "Open this in Bankroll". In the simulator the
+stand-in steps aside: the SDK's own bridge is the host there, and the
+simulator answers as the user you pick.
 
 **On a phone:** `npm run dev` runs the dev server behind a public tunnel and
 prints a QR that opens the app inside Bankroll, with real sessions and real
@@ -207,6 +209,12 @@ the balance and Play/Results tabs with empty content.
   footer navigation. `home.tsx` shows how to configure its tabs.
 - `src/app/api/me/route.ts` — claims from the verified session, plus app
   configuration. `useMe()` in `src/lib/client/bankroll.ts` reads them.
+- `src/lib/client/bankroll.ts` — the client half, and where the SDK is
+  started: it calls `bankroll.init()` as it loads (`@joinbankroll/sdk` 0.33.0
+  requires it; every call but `status()` waits for it, and one made without
+  it rejects with `not_initialized`). Client code imports `bankroll` and the
+  hooks from here, never from the SDK directly, so the SDK has always been
+  started wherever it is used.
 - `src/lib/store.ts` — the store backend this app writes documents to; see
   Storage.
 - `src/lib/restrictions.ts` — `paidPlayRestriction(session)` evaluates
@@ -281,8 +289,8 @@ and the same for `right`, `bottom` and `left`, as `.app-shell` does. A browser
 on a computer reports every `env(safe-area-inset-*)` as zero, so a phone-sized
 viewport alone does not simulate a notch. The simulator
 (`npm run dev -- --simulator`) draws the phone's status bar and home indicator
-over the app, and the stand-in host (`@joinbankroll/sdk` 0.33.0 on) sets those
-variables to the simulated phone's insets. On a phone they are not set, and the
+over the app, and the SDK (0.33.0 on) sets those variables to the simulated
+phone's insets. On a phone they are not set, and the
 device's own value is used. A bare `env()` is right on a phone and sits under
 the status bar in the simulator.
 
