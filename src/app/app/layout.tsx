@@ -11,7 +11,7 @@ export const viewport: Viewport = {
 
 // MockHost is the stand-in host for a plain browser tab, under BANKROLL_MOCK=1
 // outside production: the window.bankroll the phone would inject, with a
-// pretend user and made-up signatures the server accepts. In the simulator it
+// test user and made-up signatures the server accepts. In Bankroll Desktop it
 // steps aside and the SDK's own bridge is the host. A production build
 // renders nothing.
 export default function AppLayout({ children }: { children: React.ReactNode }) {

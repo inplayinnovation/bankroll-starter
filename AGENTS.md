@@ -93,7 +93,7 @@ npm test               # vitest run
 npm run typecheck      # tsc --noEmit
 npm run lint           # eslint
 npx next dev           # laptop: the dev server on localhost (see Run it on a laptop)
-npm run dev            # laptop: bankroll dev — the app in Bankroll Desktop, a phone on this Mac
+npm run dev            # laptop: bankroll dev — the app in Bankroll Desktop, as on a phone, a test user, test cash
 npm run phone          # laptop: bankroll dev --phone — tunnel + QR that opens the app on a phone
 git push bankroll main # laptop: Bankroll builds the test version
 git push bankroll main:live # laptop: publishes the test version
@@ -147,19 +147,19 @@ and writes screenshots to `checks/`. Look at them. Pass `--owner` to test
 screens you add for the app's owner. Under `BANKROLL_MOCK=1` the app also
 puts the stand-in host on its own page (`MockHost` from `@joinbankroll/sdk/next`,
 in `src/app/app/layout.tsx`), so `http://localhost:3000/app` runs in any
-browser, yours or an agent's, as the pretend user; without the flag a browser
+browser, yours or an agent's, as the test user; without the flag a browser
 has no host and `/app` shows "Open this in Bankroll".
 
-**In Bankroll Desktop:** `npm run dev` opens the app in Bankroll Desktop, a
-phone on the Mac, shown to a pretend user, with every call the app makes to
-its host and every transaction on a local chain listed beside it. The people,
-their ages, verification and balances are picked in its People pane; payments
-settle in fake dollars on a chain Bankroll Desktop runs, and the app's server
-confirms them with the SDK's real code. The stand-in host steps aside there:
-the SDK's own bridge is the host, and Bankroll Desktop answers. Bankroll
-Desktop runs the dev server itself and keeps running; the command prints the
-app's address and ends. A Mac with no Bankroll Desktop installs it first
-(macOS only; elsewhere, `npm run phone`).
+**In Bankroll Desktop:** `npm run dev` opens the app in Bankroll Desktop,
+which runs it on the Mac the way the Bankroll app runs it on a phone: as a
+test user, with test cash, with every call the app makes to its host and
+every payment listed beside it. The test users, their ages, verification and
+balances are picked in its Test users pane; the app's server confirms
+test-cash payments with the SDK's real code, and no real money moves. The
+stand-in host steps aside there: the SDK's own bridge is the host, and
+Bankroll Desktop answers. Bankroll Desktop runs the dev server itself and
+keeps running; the command prints the app's address and ends. A Mac with no
+Bankroll Desktop installs it first (macOS only; elsewhere, `npm run phone`).
 
 **On a phone:** `npm run phone` runs the dev server behind a public tunnel and
 prints a QR that opens the app inside Bankroll, with real sessions and real

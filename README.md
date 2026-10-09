@@ -10,9 +10,10 @@ bankroll login
 bankroll apps create                    # the app, and its repo here
 ```
 
-Inside the clone, `npm run dev` opens the app in Bankroll Desktop: a phone on
-your Mac, shown to a pretend user who pays fake dollars on a local chain, with
-hot reload (the first run installs Bankroll Desktop if your Mac has none). `npm run phone` prints a QR instead: scan it and the app opens
+Inside the clone, `npm run dev` opens the app in Bankroll Desktop, which runs
+it on your Mac the way the Bankroll app runs it on a phone: as a test user,
+with test cash, with hot reload (the first run installs Bankroll Desktop if
+your Mac has none). `npm run phone` prints a QR instead: scan it and the app opens
 inside Bankroll on your phone, with real money. `git push bankroll main` builds
 the test version; `git push bankroll main:live` publishes it.
 
@@ -45,12 +46,12 @@ of with its own key through Bankroll (`src/lib/treasury.ts` explains the
 variables). And `npm run check` drives the app in a headless browser with a
 stand-in host, so a coding agent or CI can test it without a phone.
 
-It moves real mainnet HSUSD. `npm run phone` creates a signing key at `~/.config/bankroll/keypair.json` on first use and hands it to the dev server — it is never written into your project, so it cannot be committed. That key receives payments and signs payouts, so fund it with only what you want to risk, and give a deployment its own. Bankroll Desktop never touches it: there the app's treasury is a key made up for the purpose, and the money is fake.
+It moves real mainnet HSUSD. `npm run phone` creates a signing key at `~/.config/bankroll/keypair.json` on first use and hands it to the dev server — it is never written into your project, so it cannot be committed. That key receives payments and signs payouts, so fund it with only what you want to risk, and give a deployment its own. Bankroll Desktop never touches it: there the app is paid in test cash, and no real money moves.
 
 ## Commands
 
 ```bash
-npm run dev                                     # Bankroll Desktop: the app in a phone on this Mac
+npm run dev                                     # Bankroll Desktop: the app as on a phone, a test user, test cash
 npm run phone                                   # tunnel + QR — the app on your phone, real money
 git push bankroll main                          # a Bankroll-built app: Bankroll builds the test version
 git push bankroll main:live                     # publishes it
