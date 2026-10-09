@@ -93,7 +93,7 @@ npm test               # vitest run
 npm run typecheck      # tsc --noEmit
 npm run lint           # eslint
 npx next dev           # laptop: the dev server on localhost (see Run it on a laptop)
-npm run dev            # laptop: bankroll dev — the app in the simulator, a phone on this computer
+npm run dev            # laptop: bankroll dev — the app in Bankroll Desktop, a phone on this Mac
 npm run phone          # laptop: bankroll dev --phone — tunnel + QR that opens the app on a phone
 git push bankroll main # laptop: Bankroll builds the test version
 git push bankroll main:live # laptop: publishes the test version
@@ -150,15 +150,16 @@ in `src/app/app/layout.tsx`), so `http://localhost:3000/app` runs in any
 browser, yours or an agent's, as the pretend user; without the flag a browser
 has no host and `/app` shows "Open this in Bankroll".
 
-**In the simulator:** `npm run dev` opens the app in a phone frame in the
-browser, shown to a pretend user, with every call the app makes to its host
-and every transaction on a local chain listed beside it. The users, their
-ages, verification and balances are picked in its sidebar; payments settle in
-fake dollars on a chain the CLI runs on this computer, and the app's server
+**In Bankroll Desktop:** `npm run dev` opens the app in Bankroll Desktop, a
+phone on the Mac, shown to a pretend user, with every call the app makes to
+its host and every transaction on a local chain listed beside it. The people,
+their ages, verification and balances are picked in its People pane; payments
+settle in fake dollars on a chain Bankroll Desktop runs, and the app's server
 confirms them with the SDK's real code. The stand-in host steps aside there:
-the SDK's own bridge is the host, and the simulator answers. It keeps
-running: start it as a background task, and add `--no-open` when nobody is at
-the screen.
+the SDK's own bridge is the host, and Bankroll Desktop answers. Bankroll
+Desktop runs the dev server itself and keeps running; the command prints the
+app's address and ends. A Mac with no Bankroll Desktop installs it first
+(macOS only; elsewhere, `npm run phone`).
 
 **On a phone:** `npm run phone` runs the dev server behind a public tunnel and
 prints a QR that opens the app inside Bankroll, with real sessions and real
@@ -172,7 +173,7 @@ start. "Can't open this app" almost always means a dead tunnel.
 If you are an agent: run `npm run phone` as a background task — its output, the
 QR included, is never shown to the user. Put the QR **in your chat reply** as
 plain monospace glyphs in a fenced code block, the play link under it;
-`bankroll dev` prints exactly that when stdout is not a TTY, so re-print it
+`npm run phone` prints exactly that when stdout is not a TTY, so re-print it
 verbatim. Never relay the ANSI QR from a TTY run — its contrast is in the
 color codes, so chat strips it to a wall of `▀` — and never send the QR as an
 image file or attachment; neither renders in a terminal chat.
@@ -296,11 +297,11 @@ shell; see [anatomy.md](./anatomy.md).
 inset, write `var(--bankroll-safe-area-inset-top, env(safe-area-inset-top))`,
 and the same for `right`, `bottom` and `left`, as `.app-shell` does. A browser
 on a computer reports every `env(safe-area-inset-*)` as zero, so a phone-sized
-viewport alone does not simulate a notch. The simulator (`npm run dev`)
-draws the phone's status bar and home indicator over the app, and the SDK
-(0.33.0 on) sets those variables to the simulated phone's insets. On a phone they are not set, and the
-device's own value is used. A bare `env()` is right on a phone and sits under
-the status bar in the simulator.
+viewport alone does not simulate a notch. Bankroll Desktop (`npm run dev`)
+gives the page the phone's own insets, so `env(safe-area-inset-*)` reads them
+there as on a phone, and the SDK (0.33.0 on) sets those variables wherever
+the host tells it the insets. The `var(--bankroll-safe-area-inset-top,
+env(safe-area-inset-top))` form is right everywhere.
 
 **The surface owns its header.** `home.tsx` renders `BankrollBalances` at the
 top right inside `Gate`. Keeping the header with the surface lets gameplay
