@@ -36,7 +36,25 @@ export interface GameDefinition<Challenge, State, Action, Result, View> {
   ): Progress<State, Result>;
   view(state: Readonly<State>, context: GameContext<Challenge>): View;
   compare(a: Readonly<Result>, b: Readonly<Result>): 'a' | 'b' | 'tie';
+  /**
+   * Development only. Under BANKROLL_MOCK=1 a lone player is paired with a
+   * stand-in opponent; with this hook the stand-in plays this result as soon
+   * as the player's own round is over, so a win, a loss and a tie can all be
+   * seen on screen. `wanted` is the outcome the developer asked for with
+   * BANKROLL_MOCK_OUTCOME (win, loss or tie, for the player; unset, it varies
+   * from match to match) and `own` is the player's result. Return null to
+   * let the stand-in forfeit instead, which is what a game without the hook
+   * gets, one minute after pairing. Never called in production.
+   */
+  mockOpponent?(input: {
+    challenge: Readonly<Challenge>;
+    own: Readonly<Result>;
+    wanted: MockOutcome;
+  }): Result | null;
 }
+
+/** The outcome a developer asks the stand-in opponent to produce, for the player. */
+export type MockOutcome = 'win' | 'loss' | 'tie';
 
 export interface Policy {
   entryCents: number;
@@ -118,8 +136,10 @@ export interface RoundSnapshot<View, Result> {
 }
 
 /** Safe player projection. Payment and start coordination belong to the engine client. */
-export interface RoundView<View, Result>
-  extends Omit<RoundSnapshot<View, Result>, 'sequence' | 'payment' | 'allowed' | 'status'> {
+export interface RoundView<View, Result> extends Omit<
+  RoundSnapshot<View, Result>,
+  'sequence' | 'payment' | 'allowed' | 'status'
+> {
   status: 'starting' | 'playing' | 'finished' | 'forfeited' | 'cancelled' | 'needs_attention';
   canAct: boolean;
 }

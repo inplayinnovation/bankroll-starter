@@ -24,11 +24,27 @@ import {
   type EngineOptions,
   type CommandResult,
   type GameContext,
+  type MockOutcome,
   type Progress,
   type OperatorInspection,
   type RoundSnapshot as RoundView,
 } from './types';
 import { canonical, copy, equal, hash, identifier, termsFor, validateGame } from './util';
+
+/** The stand-in opponent's no-show window under the mock: one minute, the mock's timer granularity. */
+export const MOCK_START_WINDOW_MS = 60_000;
+const MOCK_OUTCOMES: readonly MockOutcome[] = ['win', 'loss', 'tie'];
+
+/**
+ * The outcome the stand-in opponent produces for the player, under the mock:
+ * BANKROLL_MOCK_OUTCOME when a developer sets it (win, loss or tie), else one
+ * of the three by the match's id, so every outcome turns up across a few rounds.
+ */
+export function mockOutcome(matchId: string): MockOutcome {
+  const asked = process.env.BANKROLL_MOCK_OUTCOME;
+  if (asked === 'win' || asked === 'loss' || asked === 'tie') return asked;
+  return MOCK_OUTCOMES[parseInt(hash(matchId).slice(0, 8), 16) % MOCK_OUTCOMES.length]!;
+}
 
 /** A server-only engine. The caller supplies verified identities, never client wallet claims. */
 export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R, V>) {
@@ -87,6 +103,46 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
     return match ? match.matchedAt + entry.terms.startWindowMs : null;
   };
   const synthetic = (wallet: string) => mockEnabled() && wallet === MOCK_OPPONENT;
+
+  /**
+   * Development only. What the stand-in opponent plays, once the player's own
+   * round is done: the game's answer to the outcome the developer asked for,
+   * or null when the game has no hook, and the stand-in forfeits as before.
+   * A hook that throws, or answers something that is not JSON, is a game
+   * fault on the match: visible, never a made-up result.
+   */
+  function standIn(match: Match<Json>, entries: Array<Entry | null>): Entry | null {
+    const admission = match.tickets.find((ticket) => synthetic(ticket.input.player));
+    const real = entries.find((entry): entry is Entry => entry !== null);
+    // Nothing to play against until the player's own round is over, with a result.
+    if (!admission || !real || !real.finish || real.finish.reason === 'forfeit') return null;
+    const result = real.finish.result;
+    if (result === null) return null;
+    const rules = definition(real);
+    if (!rules.mockOpponent) return null;
+    const played = rules.mockOpponent({
+      challenge: copy(real.challenge),
+      own: copy(result),
+      wanted: mockOutcome(match.id),
+    });
+    if (played === null) return null;
+    return {
+      ...real,
+      id: admission.input.id,
+      wallet: admission.input.player,
+      payment: null,
+      receipt: null,
+      ticket: null,
+      ticketInput: null,
+      play: null,
+      finish: { reason: 'played', result: copy(played) },
+      payout: null,
+      timers: {},
+      commands: {},
+      sequence: 0,
+      issue: null,
+    };
+  }
 
   function progress(
     entry: Entry,
@@ -267,8 +323,9 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
         await store.change<MatchDocument>(path, (current) => ({ ...current, issue: 'game_fault' }));
         return;
       }
+      // The stand-in opponent is never paid; under the mock nothing moves anyway.
       const recipients: PayRecipient[] = entries
-        .filter((entry): entry is Entry => entry !== null)
+        .filter((entry): entry is Entry => entry !== null && !synthetic(entry.wallet))
         .map((entry) => ({
           to: entry.wallet,
           amountCents:
@@ -348,8 +405,23 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
       await adopt(playerPath, { id: player.id, state: 'matched', admission, match });
       entries.push(await advance(playerPath, at));
     }
-    const mockDue = match.matchedAt + source.terms.startWindowMs;
     const hasSynthetic = entries.some((entry) => entry === null);
+    // The stand-in never starts, so its no-show window is the mock's short
+    // one: the mock's timers fire to the minute, and a minute is the shortest
+    // wait that still ends by itself when nobody asks.
+    const mockDue =
+      match.matchedAt + (hasSynthetic ? MOCK_START_WINDOW_MS : source.terms.startWindowMs);
+    let opponent: Entry | null = null;
+    if (hasSynthetic && !document.payout && !document.issue) {
+      try {
+        opponent = standIn(match, entries);
+      } catch (error) {
+        if (error instanceof EngineError && error.code === 'game_version_unavailable') throw error;
+        await store.change<MatchDocument>(path, (current) =>
+          current.issue ? current : { ...current, issue: 'game_fault' },
+        );
+      }
+    }
     if (hasSynthetic && at < mockDue && !document.payout) {
       await deadlines.update<MatchDocument>(path, (current) => ({
         value: current,
@@ -360,8 +432,13 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
       await store.change<MatchDocument>(path, (current) =>
         current.issue ? current : { ...current, issue: 'player_needs_attention' },
       );
-    } else if (entries.every((entry) => (entry ? Boolean(entry.finish) : at >= mockDue))) {
-      await settle(path, entries);
+    } else if (
+      entries.every((entry) => (entry ? Boolean(entry.finish) : opponent !== null || at >= mockDue))
+    ) {
+      await settle(
+        path,
+        entries.map((entry) => entry ?? opponent),
+      );
     }
     const current = await required<MatchDocument>(path);
     for (const entry of entries) {

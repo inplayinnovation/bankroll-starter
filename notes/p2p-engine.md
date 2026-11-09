@@ -137,7 +137,7 @@ const words = defineGame({
 
 Context supplies accepted challenge data, start time, end-of-play time, final submission cutoff and the effective event time. Randomness and command timing are fixed for a transition; retrying a conditional write cannot reroll a board. Hooks are synchronous and pure. Network validation inside a retried game hook is outside this version's contract.
 
-The engine handles no-shows, ties, fees and the development opponent. `compare` receives two actual game results, including legitimate zero scores. It does not receive a null game as a stand-in for an absent player.
+The engine handles no-shows, ties, fees and the development opponent. `compare` receives two actual game results, including legitimate zero scores. It does not receive a null game as a stand-in for an absent player. Under the mock the stand-in opponent plays the result of the game's optional `mockOpponent({ challenge, own, wanted })` hook as soon as the player's round is over, with `wanted` from `BANKROLL_MOCK_OUTCOME` or varied by match, and is never paid; without the hook it forfeits one minute after pairing (`MOCK_START_WINDOW_MS`), not after the offer's five.
 
 | Game style | Input to `act` | Game's responsibility |
 | --- | --- | --- |

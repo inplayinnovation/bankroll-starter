@@ -261,6 +261,16 @@ Screens, animation and local simulation belong to the app. Practice may reuse
 the same rules and renderer without paid entries. Keep practice results and
 hidden future paid challenges separate.
 
+Under `BANKROLL_MOCK=1` a lone player is paired with a stand-in opponent after
+a few seconds. Give the game a `mockOpponent({ challenge, own, wanted })` hook
+and the stand-in plays the result it returns the moment the player's own round
+is over, so the win, the loss and the tie can all be seen on screen: `own` is
+the player's result and `wanted` the outcome to produce for the player, from
+`BANKROLL_MOCK_OUTCOME` (`win`, `loss` or `tie`) or, unset, one of the three
+by the match. Without the hook, or when it returns null, the stand-in forfeits
+one minute after pairing. The stand-in is never paid, and the hook is never
+called in production.
+
 ## Operations and upgrades
 
 There are only queue, no-show and game-deadline timers. Failed deliveries use
