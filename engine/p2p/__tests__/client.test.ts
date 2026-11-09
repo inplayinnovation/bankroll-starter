@@ -49,6 +49,8 @@ function fixture() {
       entryCents: 100,
       paid: false,
       opponent: 'waiting',
+      opponentUsername: null,
+      opponentResult: null,
       game: null,
       result: null,
       canAct: false,

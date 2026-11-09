@@ -33,6 +33,8 @@ import { canonical, copy, equal, hash, identifier, termsFor, validateGame } from
 
 /** The stand-in opponent's no-show window under the mock: one minute, the mock's timer granularity. */
 export const MOCK_START_WINDOW_MS = 60_000;
+/** The handle the stand-in opponent plays under, so a screen can name it. */
+export const STAND_IN_USERNAME = 'stand-in';
 const MOCK_OUTCOMES: readonly MockOutcome[] = ['win', 'loss', 'tie'];
 
 /**
@@ -353,6 +355,14 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
         (current, payout) => ({
           ...current,
           outcome: { kind: winner === null ? 'tie' : 'win', winner },
+          finishes: Object.fromEntries(
+            entries
+              .filter((entry): entry is Entry => entry !== null)
+              .map((entry) => [
+                entry.wallet,
+                { reason: entry.finish!.reason, result: entry.finish!.result as Json | null },
+              ]),
+          ),
           payout,
         }),
       );
@@ -374,6 +384,16 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
       )
     )
       throw new Error('Invalid matchmaking result');
+    // Each player's handle, kept on the match so a view can name the opponent
+    // without reading the opponent's round. The stand-in plays under its own.
+    const usernames: Record<string, string | null> = {};
+    for (const admission of match.tickets) {
+      const player = admission.input.player;
+      usernames[player] = synthetic(player)
+        ? STAND_IN_USERNAME
+        : ((await store.read<Entry>(roundPath(player, admission.input.id)))?.value.username ??
+          null);
+    }
     const path = matchPath(match.id);
     const document = await store.create<MatchDocument>(path, {
       schema: 1,
@@ -385,6 +405,7 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
       version: source.version,
       match,
       terms: source.terms,
+      usernames,
       outcome: null,
       payout: null,
       issue: null,
@@ -656,6 +677,9 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
     const settlement = match
       ? ((await store.read<MatchDocument>(matchPath(match.id)))?.value ?? null)
       : null;
+    const opponentWallet =
+      match?.tickets.find((admission) => admission.input.player !== entry.wallet)?.input.player ??
+      null;
     const payout = entry.payout ?? settlement?.payout;
     let issue = entry.issue ?? settlement?.issue ?? payout?.issue ?? null;
     let gameView: V | null = null;
@@ -721,6 +745,10 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
       payment,
       paid: Boolean(entry.receipt && !entry.paymentRejected),
       opponent: match ? 'matched' : entry.cancelled ? 'cancelled' : 'waiting',
+      opponentUsername: opponentWallet ? (settlement?.usernames?.[opponentWallet] ?? null) : null,
+      opponentResult: opponentWallet
+        ? ((settlement?.finishes?.[opponentWallet]?.result as R | null | undefined) ?? null)
+        : null,
       game: gameView,
       result: entry.finish?.result ?? null,
       deadlines: {
@@ -814,6 +842,7 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
         revision: 0,
         id,
         wallet: actor.wallet,
+        username: actor.username ?? null,
         origin,
         createdAt: at,
         gameId: game.id,

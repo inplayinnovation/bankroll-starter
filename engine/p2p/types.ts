@@ -5,6 +5,8 @@ import type { BankrollPrimitives } from './bankroll';
 
 export interface Actor {
   wallet: string;
+  /** The player's Bankroll handle from the verified session. Their opponent sees it. */
+  username?: string;
 }
 
 export type Progress<State, Result> =
@@ -117,6 +119,16 @@ export interface RoundSnapshot<View, Result> {
   payment: PaymentRequest | null;
   paid: boolean;
   opponent: 'waiting' | 'matched' | 'cancelled';
+  /**
+   * The opponent's Bankroll handle from the moment the two are paired. Null
+   * before that, and for an opponent whose session carried none.
+   */
+  opponentUsername: string | null;
+  /**
+   * The opponent's game result once the match is settled. Null before that,
+   * and for an opponent who never played.
+   */
+  opponentResult: Result | null;
   game: View | null;
   result: Result | null;
   deadlines: {

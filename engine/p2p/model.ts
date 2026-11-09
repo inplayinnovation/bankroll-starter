@@ -44,6 +44,8 @@ export interface Round<C, S, R> {
   revision: number;
   id: string;
   wallet: string;
+  /** The player's Bankroll handle at entry. Rounds written before this field lack it. */
+  username?: string | null;
   origin: string;
   createdAt: number;
   gameId: string;
@@ -83,6 +85,13 @@ export interface MatchDocument {
   version: number;
   match: Match<Json>;
   terms: Terms;
+  /**
+   * Each player's handle at pairing, by wallet; the stand-in is "stand-in".
+   * Documents written before this field lack it.
+   */
+  usernames?: Record<string, string | null>;
+  /** Each side's finish as it was settled, by wallet, written with the outcome. */
+  finishes?: Record<string, { reason: 'played' | 'timeout' | 'forfeit'; result: Json | null }>;
   outcome: { kind: 'win' | 'tie'; winner: string | null } | null;
   payout: Payout | null;
   issue: string | null;
