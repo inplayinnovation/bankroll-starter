@@ -19,6 +19,13 @@ export interface DeadlineDecision<D> {
 
 const PURPOSES: Purpose[] = ['queue', 'no-show', 'game'];
 const ATTEMPTS = 20;
+/**
+ * Bankroll fires a timer to the minute, so a timer already registered that
+ * fires after a new deadline, within this long, wakes the engine at the same
+ * minute a fresh one would. It is kept, with the new cutoff: one registration
+ * per minute of play, not one per input.
+ */
+const REUSE_WINDOW_MS = 60_000;
 
 /** Register only new business deadlines, then install against their exact preparation. */
 export function createDeadlines({
@@ -53,6 +60,14 @@ export function createDeadlines({
         }
         if (!Number.isFinite(dueAt)) throw new Error('Invalid deadline');
         if (existing?.dueAt === dueAt) continue;
+        if (existing) {
+          const fires = Date.parse(existing.at);
+          if (Number.isFinite(fires) && fires >= dueAt && fires - dueAt < REUSE_WINDOW_MS) {
+            // The same timer, delivered after the new cutoff as the event check requires.
+            timers = { ...timers, [purpose]: { ...existing, dueAt } };
+            continue;
+          }
+        }
         const token = randomUUID();
         const registered = await primitives.timer({
           origin: current.origin,

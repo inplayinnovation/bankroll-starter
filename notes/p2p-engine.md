@@ -230,7 +230,7 @@ There are three timer purposes:
 | No-show | An unstarted matched player's window has ended | Record the forfeit and complete any now-due match decision |
 | Game | A declared gameplay or submission deadline has arrived | Apply the game's deadline transition and complete resulting finalization |
 
-There is **no recovery timer, periodic retry timer or settle-refund timer**. Ordinary state writes do not register timers. Register a timer when establishing a deadline; replace it only when the game's next deadline changes. Invalidated timers may still arrive and are recognized by identity.
+There is **no recovery timer, periodic retry timer or settle-refund timer**. Ordinary state writes do not register timers. Register a timer when establishing a deadline; replace it only when the game's next deadline changes, and not even then while the registered timer fires within the minute after the new deadline: Bankroll fires to the minute, so that timer wakes the engine at the same minute a fresh one would, and the slot keeps its identity with the new cutoff (one registration per minute of play, not per input). Invalidated timers may still arrive and are recognized by identity.
 
 Store the exact business deadline separately from Bankroll's scheduled delivery time. The current SDK schedules in whole relative minutes; use `max(1, ceil((deadline - now) / 60_000))`. Commands enforce the recorded cutoff. A late webhook grants no additional play.
 

@@ -86,6 +86,44 @@ describe('business deadlines', () => {
     expect(harness.timers.size).toBe(3);
   });
 
+  // A game whose deadline moves on every input would otherwise register a
+  // timer per input and leave a stale delivery behind each one.
+  it('keeps a registered timer for a deadline that moves within the minute it fires in', async () => {
+    const { harness, deadlines, dueAt } = await fixture();
+    const armed = await deadlines.update<Round>(path, (current) => ({
+      value: current,
+      deadlines: { game: dueAt - 50_000 },
+    }));
+    const slot = armed.timers.game!;
+    const fires = Date.parse(slot.at);
+    expect(fires).toBeGreaterThanOrEqual(dueAt - 50_000);
+    const later = await deadlines.update<Round>(path, (current) => ({
+      value: current,
+      deadlines: { game: fires - 1_000 },
+    }));
+    expect(later.timers.game).toEqual({ ...slot, dueAt: fires - 1_000 });
+    const earlier = await deadlines.update<Round>(path, (current) => ({
+      value: current,
+      deadlines: { game: fires - 59_000 },
+    }));
+    expect(earlier.timers.game).toEqual({ ...slot, dueAt: fires - 59_000 });
+    expect(harness.timers.size).toBe(1);
+    // Past the minute the timer fires in, a new timer is needed.
+    const beyond = await deadlines.update<Round>(path, (current) => ({
+      value: current,
+      deadlines: { game: fires + 1 },
+    }));
+    expect(beyond.timers.game?.token).not.toBe(slot.token);
+    expect(beyond.timers.game?.dueAt).toBe(fires + 1);
+    // A deadline more than a minute before the timer fires is served sooner by a fresh one.
+    const sooner = await deadlines.update<Round>(path, (current) => ({
+      value: current,
+      deadlines: { game: fires - 60_000 },
+    }));
+    expect(sooner.timers.game?.token).not.toBe(beyond.timers.game?.token);
+    expect(harness.timers.size).toBe(3);
+  });
+
   it('does not commit a state when its deadline registration fails', async () => {
     const { harness, store, deadlines, dueAt } = await fixture();
     harness.failNext('timer.after', new Error('Lost registration response'));
