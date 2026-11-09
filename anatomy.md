@@ -49,6 +49,17 @@ development, which fails `npm run check`.
 **Results.** Show the player's game history. Each entry opens that game's result.
 History is the tab that scrolls (`scroll: true`); settings, if any, may too.
 
+**Page gestures.** The `/app` layout mounts `AppScrollGuard`, and the root
+viewport has overflow and overscroll disabled only while `.app-shell` exists.
+This keeps the header and tabs still when a finger drags the background.
+Mark each intentional scrolling element with `data-scroll=""` and give it a
+bounded height plus `overflow-y: auto`. `TabbedScreen` does this for history.
+Mark game-specific player lists, help text and result rosters the same way.
+The guard permits scrolling while that element has room in the gesture's
+direction and blocks outward drags at its boundaries, including empty lists.
+Game gestures still use pointer events; taps and pinch gestures are not
+cancelled by this guard. Keep the public site at `/` outside the app shell.
+
 **Playing.** This is the app's most important screen. Give it the largest share
 of design, implementation, and playtesting attention: the scene, responsive
 controls, readable game state, and feedback for each action. Play opens a

@@ -8,6 +8,18 @@ body {
   @apply bg-neutral-950 text-neutral-100 antialiased;
 }
 
+/* Scope the viewport lock to /app. The public site remains a normal page,
+   including after client navigation; a global stylesheet can outlive a route. */
+html:has(.app-shell),
+body:has(.app-shell) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.app-shell [data-scroll] {
+  overscroll-behavior-y: contain;
+}
+
 /* The app runs inside the Bankroll host's webview, on a phone whose OS reserves
    the top for a notch or status bar and the bottom for the home indicator.
    Padding to at least the inset keeps content out from under both, and falls
