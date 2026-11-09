@@ -3,6 +3,8 @@
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, type ReactNode } from 'react';
 
+import { buzz } from '@/lib/client/haptics';
+
 type Tab = {
   id: string;
   label: string;
@@ -77,6 +79,7 @@ export function TabbedScreen({
         key={active.id}
         ref={content}
         aria-label={active.label}
+        data-scroll={active.scroll ? '' : undefined}
         tabIndex={active.scroll ? 0 : undefined}
         className={`min-h-0 min-w-0 flex-1 overflow-x-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-400 ${
           active.scroll ? 'overflow-y-auto overscroll-y-contain' : 'overflow-hidden'
@@ -106,6 +109,8 @@ export function TabbedScreen({
                 )
                   return;
                 event.preventDefault();
+                // Every tap buzzes, a tab switch included (AGENTS.md, "Haptics").
+                buzz('selection');
                 // Next observes native history updates. Replacing keeps tab
                 // switches out of Back history; unrelated query params survive.
                 window.history.replaceState(null, '', href + window.location.hash);

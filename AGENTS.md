@@ -216,7 +216,9 @@ the balance and Play/Results tabs with empty content.
 - `src/components/bankroll-balances.tsx` — the host balance display at the top
   right, backed by `src/lib/client/balances.ts`.
 - `src/components/tabbed-screen.tsx` — the header, content area, and pinned
-  footer navigation. `home.tsx` shows how to configure its tabs.
+  footer navigation. `home.tsx` shows how to configure its tabs. Its tabs buzz.
+- `src/components/button.tsx` — a button that buzzes on every click; use it
+  for every tap, or call `buzz()` from `src/lib/client/haptics.ts` yourself.
 - `src/app/api/me/route.ts` — claims from the verified session, plus app
   configuration. `useMe()` in `src/lib/client/bankroll.ts` reads them.
 - `src/lib/client/bankroll.ts` — the client half, and where the SDK is
@@ -335,6 +337,28 @@ SDK capability: an older host may answer `update_required` even when sessions
 work. The header shows an update hint and the rest of the app keeps working.
 Never authorize play, price an order, or release value against this client
 display; settled charges and server records remain authoritative.
+
+## Haptics
+
+The phone's vibration is part of the interface: every tap and every game
+moment calls `bankroll.haptics({ type })`. A tap is anything a finger does
+on purpose: a button, a tab, a choice, a row that opens something, a close.
+A game moment is anything the game decides: a start, a hit or a miss, a round
+that ends, a win or a loss. The call never rejects and does nothing in a plain
+browser, so it gates nothing. Types: `selection` for a tap that picks or
+switches, `light` for a tap that does something, `medium` and `heavy` for the
+game's own weight, `success`, `warning` and `error` for outcomes.
+
+The shared pieces do it themselves, so use them: `TabbedScreen` buzzes on a
+tab switch, `Button` (`src/components/button.tsx`) buzzes on every click, and
+`buzz()` in `src/lib/client/haptics.ts` is the one call for everything else.
+A hand-written `<button>`, `<a>` or pointer handler must call `buzz()` itself.
+
+Before you push, check every tap by hand: list the handlers with
+`grep -rn "onClick=\|onPointerDown=\|onTouchStart=\|onChange=" src`, and for
+each one say where its buzz is (its own call, or a `Button`). The ones to
+forget are the small ones: the close of a help screen, a backdrop tap, the
+tabs, a row in a list, a retry.
 
 ## Storage
 
