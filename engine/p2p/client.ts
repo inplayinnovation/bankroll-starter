@@ -54,6 +54,22 @@ class TransportError extends EngineError {
 }
 const terminal = <V, R>(round: RoundView<V, R>) =>
   round.status !== 'starting' && round.status !== 'playing';
+/**
+ * The payment sheet's definite answers after which nothing was charged: the
+ * player declined, the price expired on the sheet, the balance was short, or
+ * consent was refused. Every other failure may have charged, and keeps the
+ * intent for resume().
+ */
+const NO_CHARGE = new Set([
+  'payment_denied',
+  'charge_expired',
+  'insufficient_funds',
+  'consent_declined',
+]);
+const noCharge = (error: unknown) => {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && NO_CHARGE.has(code);
+};
 const settled = <V, R>(round: RoundView<V, R>) =>
   round.status === 'needs_attention' ||
   (round.status === 'cancelled' &&
@@ -135,6 +151,13 @@ export function createP2PClient<V, R>(options: P2PClientOptions): P2PClient<V, R
     if (life.signal.aborted) return;
     snapshot = next;
     listeners.forEach((listener) => listener());
+  }
+  /** The intent is over: nothing saved, nothing watched. The next play() starts a new entry. */
+  function forget() {
+    stopWatch();
+    storage().removeItem(storageKey);
+    intent = null;
+    current = null;
   }
   function accept(reply: RoundReply<V, R>, starting = false) {
     alive();
@@ -296,14 +319,20 @@ export function createP2PClient<V, R>(options: P2PClientOptions): P2PClient<V, R
           !error.retryable &&
           snapshot.round &&
           snapshot.round.status !== 'starting';
+        // A sheet closed with nothing charged is not an error state: the
+        // player is back where they were, free to pick any offer.
+        const declined = noCharge(error) && intent === null && current === null;
         if (!life.signal.aborted)
           publish({
             ...snapshot,
-            phase: rejectedAction
-              ? snapshot.round!.status === 'playing'
-                ? 'playing'
-                : 'finished'
-              : 'error',
+            ...(declined ? { round: null } : {}),
+            phase: declined
+              ? 'idle'
+              : rejectedAction
+                ? snapshot.round!.status === 'playing'
+                  ? 'playing'
+                  : 'finished'
+                : 'error',
             error: {
               code:
                 error instanceof EngineError
@@ -361,13 +390,22 @@ export function createP2PClient<V, R>(options: P2PClientOptions): P2PClient<V, R
       if (Date.parse(reply.payment.expiresAt) <= Date.now())
         throw new EngineError('payment_expired', 'This unpaid entry has expired.');
       save({ ...value, charge: 'requested' });
-      await aborted(
-        Promise.resolve().then(() => {
-          alive();
-          return charge(reply.payment!);
-        }),
-        life.signal,
-      );
+      try {
+        await aborted(
+          Promise.resolve().then(() => {
+            alive();
+            return charge(reply.payment!);
+          }),
+          life.signal,
+        );
+      } catch (error) {
+        // Nothing was charged, for certain: the intent is over, so the next
+        // Play starts a new entry with any offer instead of this one being
+        // held for its payment window. The unpaid entry expires on the server
+        // by itself. An uncertain outcome keeps the intent, as before.
+        if (noCharge(error) && !life.signal.aborted) forget();
+        throw error;
+      }
       alive();
       save({ ...load()!, charge: 'confirmed' });
     }

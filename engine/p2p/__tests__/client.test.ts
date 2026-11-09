@@ -157,13 +157,14 @@ describe('player workflow failure and cleanup behavior', () => {
     expect(f.requests.filter((input) => input.type === 'play')).toHaveLength(1);
   });
 
-  it.each(['payment_denied', 'host_response_lost'])(
-    'retains the same entry and charge key after %s',
+  it.each(['host_response_lost', 'unknown'])(
+    'retains the same entry and charge key after an uncertain %s',
     async (code) => {
       const f = fixture();
       f.charge.mockRejectedValueOnce(Object.assign(new Error(code), { code }));
       const first = f.browser();
       await expect(first.play()).rejects.toMatchObject({ code });
+      expect(first.getSnapshot()).toMatchObject({ phase: 'error', round: { id: 'round-1' } });
       first.dispose();
       f.charge.mockImplementationOnce(async () => {
         f.reply.round.paid = true;
@@ -177,6 +178,40 @@ describe('player workflow failure and cleanup behavior', () => {
       expect(f.requests.filter((input) => input.type === 'play')).toHaveLength(1);
     },
   );
+
+  // Closing the sheet charged nothing, so the player is not held to that
+  // entry for its payment window: the next Play may pick another offer.
+  it.each(['payment_denied', 'charge_expired', 'insufficient_funds', 'consent_declined'])(
+    'lets go of the entry after a definite %s, and the next Play starts fresh with any offer',
+    async (code) => {
+      const f = fixture();
+      f.charge.mockRejectedValueOnce(Object.assign(new Error(code), { code }));
+      const client = f.browser();
+      await expect(client.play({ offerId: 'one' })).rejects.toMatchObject({ code });
+      expect(client.getSnapshot()).toMatchObject({ phase: 'idle', round: null, error: { code } });
+      expect(f.storage.getItem('bankroll:p2p:/api/game:v1')).toBeNull();
+      f.charge.mockImplementationOnce(async () => {
+        f.reply.round.paid = true;
+      });
+      const next = client.play({ offerId: 'five' });
+      await vi.advanceTimersByTimeAsync(10);
+      expect((await next).status).toBe('playing');
+      const attempts = f.requests.filter((input) => input.type === 'play');
+      expect(attempts.map((input) => input.offerId)).toEqual(['one', 'five']);
+      expect(new Set(attempts.map((input) => input.commandId)).size).toBe(2);
+      expect(f.charge).toHaveBeenCalledTimes(2);
+      expect(vi.getTimerCount()).toBeGreaterThanOrEqual(0);
+    },
+  );
+
+  it('keeps an uncertain sheet failure on the same entry even when the player taps another offer', async () => {
+    const f = fixture();
+    f.charge.mockRejectedValueOnce(new Error('sheet interrupted'));
+    const client = f.browser();
+    await expect(client.play({ offerId: 'one' })).rejects.toThrow('sheet interrupted');
+    await expect(client.play({ offerId: 'five' })).rejects.toMatchObject({ code: 'active_entry' });
+    expect(f.requests.filter((input) => input.type === 'play')).toHaveLength(1);
+  });
 
   it('retries a lost entry response with the original identity after reload', async () => {
     const f = fixture();

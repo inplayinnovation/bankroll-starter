@@ -31,10 +31,15 @@ not expose a payment request, a manual start permission or a cancellation
 permission. The app has no lifecycle sequence to assemble.
 
 Approving payment commits the player to the game. The player can dismiss the
-host's payment sheet before approval. There is no voluntary entry-cancellation
-API, including while a paid receipt is still in transit; the server enforces
-this. Queue expiry and other automatic refund rules still apply. Navigating
-away or disposing the client does not cancel a paid entry.
+host's payment sheet before approval: when the sheet answers that nothing was
+charged (`payment_denied`, `charge_expired`, `insufficient_funds`,
+`consent_declined`), the client lets go of that entry and the snapshot returns
+to `idle` with the code in `error`, so the next `play()` starts a new entry
+with any offer; the unpaid entry expires on the server by itself. An uncertain
+failure keeps the entry for `resume()`. There is no voluntary
+entry-cancellation API, including while a paid receipt is still in transit; the
+server enforces this. Queue expiry and other automatic refund rules still
+apply. Navigating away or disposing the client does not cancel a paid entry.
 
 Browser entry points are `engine/p2p/client`, `engine/p2p/react` and
 `engine/p2p/game`. The `engine/p2p` entry point is for server configuration.
