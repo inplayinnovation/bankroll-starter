@@ -5,14 +5,14 @@
 // The manifest FORMAT ships in @joinbankroll/sdk/next, so a change to it
 // reaches this app through `npm update`. What's below is only what is yours:
 // the name, where the app boots, the address that takes payment, your token,
-// and where your users get help.
+// where your users get help, and whether you notify them.
 //
 // Your app ICON is not in the manifest: serve a square PNG at the fixed path
 // /.well-known/bankroll-icon.png (drop it in public/.well-known/). Until you
 // do, Bankroll shows a monogram of your app's name.
 import { manifestRoute } from '@joinbankroll/sdk/next';
 
-import { APP_PATH, appName, appTokens, supportUrl } from '@/lib/app-identity';
+import { APP_PATH, appName, appTokens, pushConsent, supportUrl } from '@/lib/app-identity';
 import { payeeAddress } from '@/lib/treasury';
 
 // Required: the manifest is built from the request's own host, so it must not
@@ -26,4 +26,5 @@ export const GET = manifestRoute({
   payments: payeeAddress,
   appTokens,
   supportUrl,
+  push: pushConsent,
 });

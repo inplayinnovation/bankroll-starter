@@ -1,6 +1,6 @@
 // Everything your app says about itself lives in bankroll-app.json at the
-// project root: its name, where users get help, and the tokens it issues. That
-// file IS what Bankroll signs into the manifest — it reads the file in the
+// project root: its name, where users get help, the tokens it issues, and
+// whether it notifies its users. That file IS what Bankroll signs into the manifest — it reads the file in the
 // commit it builds — so this module is config, not a translation layer. A fork
 // inherits it and then changes it. (Your icon is a file too:
 // public/.well-known/bankroll-icon.png.)
@@ -13,6 +13,7 @@ interface Declaration {
   name?: string;
   supportUrl?: string;
   appTokens?: Record<string, { name?: string; description?: string }>;
+  push?: boolean;
 }
 
 const declared: Declaration = declaration;
@@ -56,3 +57,11 @@ export const appTokens = (): Record<string, { name?: string; description?: strin
 
 /** Every mint this app accepts alongside HSUSD — the money path's allowlist. */
 export const appTokenMints = (): string[] => Object.keys(appTokens());
+
+// Whether this app notifies its users: `"push": true` in bankroll-app.json.
+// It is consent, and the signed manifest is what makes it count: a hosted app
+// gets it signed at the next build, a self-hosted app asks for the signing
+// (docs: build/push). Whom a notification reaches stays bounded by Bankroll to
+// the app's recent users. Send one with `notifyUser` from
+// `@joinbankroll/sdk/server`; it needs the app key Bankroll set for this app.
+export const pushConsent = (): boolean => declared.push === true;

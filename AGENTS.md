@@ -239,10 +239,12 @@ the balance and Play/Results tabs with empty content.
   and deadlines; bind the configured engine's `webhook` handlers here.
 - `src/lib/treasury.ts` — the payee, owner, and payout signer configuration.
 - `bankroll-app.json` — everything the app says about itself, and what Bankroll
-  signs into its manifest: `name`, `appTokens` (the tokens it issues), and
-  `supportUrl`, which puts a "Help with <app>" item in Bankroll's own menu. Any
-  URL works there — a help page, `mailto:`, `tel:`, a chat invite — and it opens
-  outside the app. Changing a claim later re-asks every existing user for
+  signs into its manifest: `name`, `appTokens` (the tokens it issues),
+  `supportUrl`, which puts a "Help with <app>" item in Bankroll's own menu, and
+  `push: true` when the app notifies its users with `notifyUser` (signed at the
+  next build; who it reaches stays bounded to the app's recent users). Any URL
+  works for support — a help page, `mailto:`, `tel:`, a chat invite — and it
+  opens outside the app. Changing a claim later re-asks every existing user for
   consent, so point the URL at something durable.
 - `src/lib/app-identity.ts` — reads that file, and holds the one claim that is
   not in it: where the app boots.
