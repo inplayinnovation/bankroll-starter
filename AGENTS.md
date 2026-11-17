@@ -386,11 +386,11 @@ test version, the live version, or both.
   server module, never in a client component, and never under a
   `NEXT_PUBLIC_` name, which Next.js builds into the code the browser
   downloads.
-- The app must build and run with a secret missing. Bankroll Desktop, `npm
-  run check`, Bankroll's own builder and a fresh clone do not have it. Close
-  that one feature, say so on the screen, and keep the rest working.
+- The app must build and run with a secret missing. A fresh clone does not
+  have it, and neither does Bankroll's own builder. Close that one feature,
+  say so on the screen, and keep the rest working.
 - On the owner's own computer a secret goes in `.env.local`, which git
-  ignores.
+  ignores. The owner writes it there, not you.
 - A switch the owner flips, such as pausing entries, is not a secret. Keep it
   in the app's own store, behind a screen that only the owner sees.
 
