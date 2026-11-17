@@ -75,11 +75,46 @@ export interface Treasury {
   signer(attemptId: string): PaymentSigner;
 }
 
+/** One player's side of a settled match. The stand-in opponent is never listed. */
+export interface SettledPlayer<Result> {
+  wallet: string;
+  /** The player's Bankroll handle at pairing. Null when their session carried none. */
+  username: string | null;
+  /** The player's own round. */
+  roundId: string;
+  /** What the engine pays the player: the prize on a win, the entry on a tie, nothing on a loss. */
+  outcome: { kind: 'win' | 'loss' | 'tie'; amountCents: number };
+  /** The player's game result. Null for a player who never played. */
+  result: Result | null;
+  opponentUsername: string | null;
+  opponentResult: Result | null;
+}
+
+/** A match whose outcome is final and whose payout is recorded. */
+export interface Settlement<Result> {
+  matchId: string;
+  /** The app's origin, as the match recorded it: what `notifyUser` asks for. */
+  origin: string;
+  offerId: string;
+  entryCents: number;
+  players: SettledPlayer<Result>[];
+}
+
 export interface EngineOptions<C, S, A, R, V> {
   game: GameDefinition<C, S, A, R, V>;
   previousVersions?: GameDefinition<C, S, A, R, V>[];
   /** Server-approved prices/policies. Defaults to one offer named 'default'. */
   offers?: Readonly<Record<string, Partial<Policy>>>;
+  /**
+   * Called once when a match is settled: its outcome is final and its payout
+   * is recorded. This is where an app tells each player the result, for
+   * example with `notifyUser`. The payout may still be on its way, so say who
+   * won, not that money arrived. The engine sends the payout first, then
+   * waits for this for at most ten seconds, logs what it throws, and never
+   * lets it change the settlement. A process that stops between the two
+   * never calls it: at most once for a match, never twice.
+   */
+  onSettled?: (settlement: Settlement<R>) => void | Promise<void>;
   store: StoreBackend;
   treasury: Treasury;
   origin(): string | Promise<string>;

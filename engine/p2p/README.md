@@ -90,6 +90,56 @@ pays $1.80 to the winner; the creator receives or retains $0.20. Ties and
 double no-shows return both stakes without a fee. This version uses HSUSD, with amounts representable
 as whole cents. Offers can override the policy values in [types.ts](./types.ts).
 
+## Tell players the result
+
+A duel is not live. A player often finishes hours before the opponent does,
+and is not in the app when the match is settled. Pass `onSettled` to
+`createP2PEngine` to tell them:
+
+```ts
+import { mockEnabled } from '@joinbankroll/sdk/mock';
+import { notifyUser } from '@joinbankroll/sdk/server';
+
+// 100 reads "$1" and 180 reads "$1.80".
+const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
+
+export const duel = createP2PEngine({
+  // ...the binding above
+  async onSettled({ origin, entryCents, players }) {
+    if (mockEnabled()) return; // a laptop has no app key, and nobody to notify
+    await Promise.all(
+      players.map((player) => {
+        const what = `your ${dollars(entryCents)} duel`;
+        const versus = player.opponentUsername ? ` against @${player.opponentUsername}` : '';
+        const [title, body] =
+          player.outcome.kind === 'win'
+            ? ['You won', `You won ${what}${versus}. ${dollars(player.outcome.amountCents)} is on its way.`]
+            : player.outcome.kind === 'tie'
+              ? ['You tied', `You tied ${what}${versus}. Your entry comes back.`]
+              : ['You lost', `You lost ${what}${versus}.`];
+        return notifyUser({ origin, to: player.wallet, title, body, path: '/app' });
+      }),
+    );
+  },
+});
+```
+
+The engine calls it once for a match, when the outcome is final and the payout
+is recorded. It lists each player with what their own view shows: the outcome,
+the amount the engine pays them, both results and the opponent's handle. The
+stand-in opponent is never listed.
+
+- The payout may still be on its way. Say who won, not that money arrived.
+- The engine sends the payout first, then waits for `onSettled` for at most
+  ten seconds. What it throws is logged and changes nothing.
+- It is called at most once for a match. A process that stops between the
+  payout and the call never makes it, so treat it as a courtesy and not as a
+  record.
+- A refund of an entry that found no opponent is not a match, and is not
+  announced.
+- Notifications need `"push": true` in `bankroll-app.json`; see
+  https://docs.joinbankroll.com/build/push.
+
 ## Bind routes and the webhook
 
 Use the standard handler for `src/app/api/game/route.ts`:

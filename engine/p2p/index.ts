@@ -11,6 +11,8 @@ export type {
   Policy,
   Progress,
   RoundView,
+  SettledPlayer,
+  Settlement,
   Treasury,
   TreasuryTerms,
 } from './types';

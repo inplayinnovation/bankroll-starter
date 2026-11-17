@@ -35,6 +35,8 @@ import { canonical, copy, equal, hash, identifier, termsFor, validateGame } from
 export const MOCK_START_WINDOW_MS = 60_000;
 /** The handle the stand-in opponent plays under, so a screen can name it. */
 export const STAND_IN_USERNAME = 'stand-in';
+/** The longest the engine waits for an app's onSettled before it moves on. */
+export const SETTLED_HOOK_LIMIT_MS = 10_000;
 const MOCK_OUTCOMES: readonly MockOutcome[] = ['win', 'loss', 'tie'];
 
 /**
@@ -300,6 +302,70 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
     }));
   }
 
+  /**
+   * Tell the app that a match is settled. Built from the stored match alone,
+   * so the app hears what each player's own view shows. It never throws and
+   * never waits longer than SETTLED_HOOK_LIMIT_MS: a notification that fails
+   * or hangs must not hold up the request that settled the match.
+   */
+  async function announce(document: MatchDocument): Promise<void> {
+    const hook = options.onSettled;
+    const outcome = document.outcome;
+    if (!hook || !outcome) return;
+    let limit: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const tickets = document.match.tickets;
+      const players = tickets
+        .filter((admission) => !synthetic(admission.input.player))
+        .map((admission) => {
+          const wallet = admission.input.player;
+          const opponent =
+            tickets.find((other) => other.input.player !== wallet)?.input.player ?? null;
+          const kind: 'win' | 'loss' | 'tie' =
+            outcome.kind === 'tie' ? 'tie' : outcome.winner === wallet ? 'win' : 'loss';
+          return {
+            wallet,
+            username: document.usernames?.[wallet] ?? null,
+            roundId: admission.input.id,
+            outcome: {
+              kind,
+              amountCents:
+                kind === 'tie'
+                  ? document.terms.entryCents
+                  : kind === 'win'
+                    ? document.terms.prizeCents
+                    : 0,
+            },
+            result: copy((document.finishes?.[wallet]?.result ?? null) as R | null),
+            opponentUsername: opponent ? (document.usernames?.[opponent] ?? null) : null,
+            opponentResult: copy(
+              (opponent ? (document.finishes?.[opponent]?.result ?? null) : null) as R | null,
+            ),
+          };
+        });
+      await Promise.race([
+        (async () =>
+          hook({
+            matchId: document.id,
+            origin: document.origin,
+            offerId: document.terms.offerId,
+            entryCents: document.terms.entryCents,
+            players,
+          }))(),
+        new Promise<never>((_, reject) => {
+          limit = setTimeout(
+            () => reject(new Error(`onSettled did not finish in ${SETTLED_HOOK_LIMIT_MS} ms`)),
+            SETTLED_HOOK_LIMIT_MS,
+          );
+        }),
+      ]);
+    } catch (error) {
+      console.error(`[p2p] onSettled failed for match ${document.id}`, error);
+    } finally {
+      clearTimeout(limit);
+    }
+  }
+
   async function settle(path: string, entries: Array<Entry | null>): Promise<void> {
     for (let count = 0; count < 20; count++) {
       const document = await required<MatchDocument>(path);
@@ -367,7 +433,14 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
         }),
       );
       if (installed) {
-        await payments.send(path);
+        // Money first. A new revision means this call wrote the outcome, so
+        // it is the one call that tells the app; the app is told even when
+        // the send fails here, and the send's error still reaches the caller.
+        try {
+          await payments.send(path);
+        } finally {
+          if (installed.revision !== document.revision) await announce(installed);
+        }
         return;
       }
     }
