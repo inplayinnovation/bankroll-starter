@@ -372,6 +372,28 @@ The SDK supplies atomic creates, compare-and-swap writes, and paginated
 listing. Keep each state transition within one document; the store has no
 transactions across documents.
 
+## Secrets
+
+An app may use an outside service that needs a key: a data feed, the owner's
+own database, a partner's API. The key is a secret, and only the app's
+**owner** sets one: `bankroll env set NAME` in their own terminal, for the
+test version, the live version, or both.
+
+- You never see a value. Do not ask for one, do not put one in a command,
+  and do not write one into the code, a file, a log, or a commit. Tell the
+  owner the names the app needs, such as `KALSHI_API_KEY`.
+- Read a secret on the server as `process.env.NAME`: in a route handler or a
+  server module, never in a client component, and never under a
+  `NEXT_PUBLIC_` name, which Next.js builds into the code the browser
+  downloads.
+- The app must build and run with a secret missing. Bankroll Desktop, `npm
+  run check`, Bankroll's own builder and a fresh clone do not have it. Close
+  that one feature, say so on the screen, and keep the rest working.
+- On the owner's own computer a secret goes in `.env.local`, which git
+  ignores.
+- A switch the owner flips, such as pausing entries, is not a secret. Keep it
+  in the app's own store, behind a screen that only the owner sees.
+
 ## Deploy
 
 A push to `main`, as described at the top, builds the test version; a push
@@ -392,7 +414,7 @@ Vercel project, wallet, and settings are Bankroll's.
   or edited under `.github/workflows`.
 
 The app uses no external images, fonts, scripts, or APIs that need an account
-or a key.
+or a key, except a service whose key the owner set as a secret (see Secrets).
 
 <!-- BEGIN:nextjs-agent-rules -->
 
