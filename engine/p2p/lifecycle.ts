@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Json, Match, Ticket } from '@joinbankroll/sdk/matchmaking';
+import type { Json, Match, Ticket, TicketInput } from '@joinbankroll/sdk/matchmaking';
 import { mockEnabled, MOCK_OPPONENT } from '@joinbankroll/sdk/mock';
 import {
   ChargeMismatchError,
@@ -648,13 +648,17 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
             cancelled,
             payment: { ...current.payment!, signature: receipt.signature },
             queueExpiresAt,
+            // The ticket states the game's entry price, for Bankroll to show.
+            // The SDK types `displayEntryCents` from 0.36.0. This app is on an
+            // older SDK, so the cast adds the field until the SDK is updated.
             ticketInput: {
               id: current.id,
               player: current.wallet,
               queue: { key: current.terms.queue, size: 2 },
               payload: copy(current.challenge) as Json,
               expiresAt: queueExpiresAt,
-            },
+              displayEntryCents: current.terms.entryCents,
+            } as TicketInput<Json>,
             issue: rejected ? 'payment_mismatch' : current.issue,
           },
           deadlines: cancelled ? {} : { queue: queueExpiresAt },

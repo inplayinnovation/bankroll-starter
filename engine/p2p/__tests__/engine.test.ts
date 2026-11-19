@@ -91,6 +91,8 @@ describe('paid asynchronous duel engine', () => {
     });
     expect(ready.deadlines.queue).toBe(harness.now() + 24 * 60 * 60_000);
     expect(harness.tickets.get(entry.id)?.admission?.input.expiresAt).toBe(ready.deadlines.queue);
+    // The ticket states the entry price of the default offer, for Bankroll to show.
+    expect(harness.tickets.get(entry.id)?.admission?.input).toMatchObject({ displayEntryCents: 100 });
     expect([...harness.timers.values()].map((timer) => timer.meta.purpose)).toEqual(['queue']);
     const count = harness.timers.size;
     await harness.deliver(event);
