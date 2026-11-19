@@ -37,6 +37,8 @@ export const MOCK_START_WINDOW_MS = 60_000;
 export const STAND_IN_USERNAME = 'stand-in';
 /** The longest the engine waits for an app's onSettled before it moves on. */
 export const SETTLED_HOOK_LIMIT_MS = 10_000;
+/** The longest join path that the matchmaking service takes on a ticket. */
+export const JOIN_PATH_MAX_BYTES = 512;
 const MOCK_OUTCOMES: readonly MockOutcome[] = ['win', 'loss', 'tie'];
 
 /**
@@ -78,6 +80,19 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
     watchSeconds: (id) => (options.treasury.signer(id).signTransaction ? 900 : 86_400),
   });
   const offers = options.offers ?? { default: {} };
+  // The matchmaking service refuses a ticket whose join path is not text
+  // within its limit, and an entry is paid before its ticket is made. So a
+  // path that the service cannot take, or one for no offer, stops the engine
+  // here, before any entry.
+  const joinPaths = options.joinPaths ?? {};
+  for (const [offerId, path] of Object.entries(joinPaths)) {
+    if (
+      !Object.hasOwn(offers, offerId) ||
+      typeof path !== 'string' ||
+      new TextEncoder().encode(path).length > JOIN_PATH_MAX_BYTES
+    )
+      throw new EngineError('invalid_game_configuration');
+  }
   const roundPrefix = (wallet: string) => `${namespace}/rounds/${hash(identifier(wallet))}/`;
   const roundPath = (wallet: string, id: string) => {
     if (!/^\d{16}-[a-f0-9]{32}$/.test(id)) throw new EngineError('invalid_round_id');
@@ -648,9 +663,11 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
             cancelled,
             payment: { ...current.payment!, signature: receipt.signature },
             queueExpiresAt,
-            // The ticket states the game's entry price, for Bankroll to show.
-            // The SDK types `displayEntryCents` from 0.36.0. This app is on an
-            // older SDK, so the cast adds the field until the SDK is updated.
+            // The ticket states the game's entry price, for Bankroll to show,
+            // and the path that opens its offer, when the app names one. The
+            // SDK types `displayEntryCents` and `joinPath` from 0.36.0. This
+            // app is on an older SDK, so the cast adds the fields until the
+            // SDK is updated.
             ticketInput: {
               id: current.id,
               player: current.wallet,
@@ -658,6 +675,9 @@ export function createLifecycle<C, S, A, R, V>(options: EngineOptions<C, S, A, R
               payload: copy(current.challenge) as Json,
               expiresAt: queueExpiresAt,
               displayEntryCents: current.terms.entryCents,
+              ...(Object.hasOwn(joinPaths, current.terms.offerId)
+                ? { joinPath: joinPaths[current.terms.offerId] }
+                : {}),
             } as TicketInput<Json>,
             issue: rejected ? 'payment_mismatch' : current.issue,
           },

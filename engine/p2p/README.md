@@ -90,6 +90,12 @@ pays $1.80 to the winner; the creator receives or retains $0.20. Ties and
 double no-shows return both stakes without a fee. This version uses HSUSD, with amounts representable
 as whole cents. Offers can override the policy values in [types.ts](./types.ts).
 
+Each entry's matchmaking ticket states the offer's entry price, which Bankroll
+shows on the Home card of a game that waits. To make that card open the offer
+and not the app's first screen, name a path on your origin for each offer:
+`joinPaths: { five: '/play?entry=five' }`. A path is text of at most 512 bytes
+and belongs to an offer that exists, or the engine stops when it starts.
+
 ## Tell players the result
 
 A duel is not live. A player often finishes hours before the opponent does,

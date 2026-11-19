@@ -8,7 +8,7 @@ import {
   type WordsState,
   type WordsView,
 } from '../examples/words';
-import { createLifecycle as createP2PEngine } from '../lifecycle';
+import { createLifecycle as createP2PEngine, JOIN_PATH_MAX_BYTES } from '../lifecycle';
 import type { Actor, EngineOptions, RoundSnapshot } from '../types';
 import { createHarness } from './harness';
 
@@ -98,6 +98,35 @@ describe('paid asynchronous duel engine', () => {
     await harness.deliver(event);
     expect(harness.tickets.size).toBe(1);
     expect(harness.timers.size).toBe(count);
+  });
+
+  it("puts an offer's join path on its ticket, and none for an offer that names no path", async () => {
+    const { harness, paid } = setup({
+      offers: { default: {}, five: { entryCents: 500 } },
+      joinPaths: { five: '/play?entry=five' },
+    });
+    const linked = await paid(alice, 'five');
+    const plain = await paid(bob);
+
+    expect(harness.tickets.get(linked.id)?.admission?.input).toMatchObject({
+      displayEntryCents: 500,
+      joinPath: '/play?entry=five',
+    });
+    expect(harness.tickets.get(plain.id)?.admission?.input).not.toHaveProperty('joinPath');
+  });
+
+  it('stops at the start for a join path of no offer, or one that the matchmaking service cannot take', () => {
+    // The service refuses such a ticket, and an entry is paid before its ticket is made.
+    const refused: Record<string, string>[] = [
+      { unknown: '/play' },
+      { default: `/${'x'.repeat(JOIN_PATH_MAX_BYTES)}` },
+      { default: 7 as unknown as string },
+    ];
+    for (const joinPaths of refused) {
+      expect(() => setup({ joinPaths })).toThrow(expect.objectContaining({ code: 'invalid_game_configuration' }));
+    }
+    // The longest path that the service takes.
+    expect(() => setup({ joinPaths: { default: `/${'x'.repeat(JOIN_PATH_MAX_BYTES - 1)}` } })).not.toThrow();
   });
 
   it('lets a player finish first, adopts that challenge for the entrant, and pays one match', async () => {

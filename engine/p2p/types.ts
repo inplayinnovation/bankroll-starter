@@ -106,6 +106,14 @@ export interface EngineOptions<C, S, A, R, V> {
   /** Server-approved prices/policies. Defaults to one offer named 'default'. */
   offers?: Readonly<Record<string, Partial<Policy>>>;
   /**
+   * The path on your origin that opens each offer, by offer id, such as
+   * "/play?entry=five". The engine puts it on the matchmaking ticket of each
+   * entry for that offer, and Bankroll opens it from the Home screen's card of
+   * a game that waits. An offer with no path gets a card that opens the app
+   * itself. A path takes no part in pairing.
+   */
+  joinPaths?: Readonly<Record<string, string>>;
+  /**
    * Called once when a match is settled: its outcome is final and its payout
    * is recorded. This is where an app tells each player the result, for
    * example with `notifyUser`. The payout may still be on its way, so say who
